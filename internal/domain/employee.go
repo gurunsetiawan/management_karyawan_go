@@ -6,10 +6,12 @@ type Employee struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
 	Email     string    `json:"email"`
+	Position  string    `json:"position"`
 	Role      string    `json:"role"`
 	Phone     string    `json:"phone"`
 	Alamat    string    `json:"alamat"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }
 
 type EmployeeRepository interface {

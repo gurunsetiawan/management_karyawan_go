@@ -22,6 +22,7 @@ type Employee struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	Email     string `json:"email"`
+	Position  string `json:"position"`
 	Role      string `json:"role"`
 	Phone     string `json:"phone"`
 	Alamat    string `json:"alamat"`
@@ -205,7 +206,7 @@ func getEmployees(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := config.DB.Query("SELECT id, name, email, role, phone, alamat, created_at FROM employees WHERE deleted_at IS NULL")
+	rows, err := config.DB.Query("SELECT id, name, email, position, role, phone, alamat, created_at FROM employees WHERE deleted_at IS NULL")
 	if err != nil {
 		log.Printf("Database query error: %v", err)
 		errorResponse := ErrorResponse{
@@ -223,7 +224,7 @@ func getEmployees(w http.ResponseWriter, r *http.Request) {
 	var employees []Employee
 	for rows.Next() {
 		var e Employee
-		if err := rows.Scan(&e.ID, &e.Name, &e.Email, &e.Role, &e.Phone, &e.Alamat, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.Email, &e.Position, &e.Role, &e.Phone, &e.Alamat, &e.CreatedAt); err != nil {
 			log.Printf("Row scan error: %v", err)
 			errorResponse := ErrorResponse{
 				Error:   "Data processing error",
@@ -256,10 +257,10 @@ func getEmployees(w http.ResponseWriter, r *http.Request) {
 }
 
 func getEmployee(w http.ResponseWriter, r *http.Request, id int) {
-	row := config.DB.QueryRow("SELECT id, name, email, role, phone, alamat, created_at FROM employees WHERE id = ? AND deleted_at IS NULL", id)
+	row := config.DB.QueryRow("SELECT id, name, email, position, role, phone, alamat, created_at FROM employees WHERE id = ? AND deleted_at IS NULL", id)
 
 	var e Employee
-	err := row.Scan(&e.ID, &e.Name, &e.Email, &e.Role, &e.Phone, &e.Alamat, &e.CreatedAt)
+	err := row.Scan(&e.ID, &e.Name, &e.Email, &e.Position, &e.Role, &e.Phone, &e.Alamat, &e.CreatedAt)
 	if err == sql.ErrNoRows {
 		errorResponse := ErrorResponse{
 			Error:   "Employee not found",
@@ -347,8 +348,8 @@ func createEmployee(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res, err := config.DB.Exec(
-		"INSERT INTO employees (name, email, role, phone, alamat) VALUES (?, ?, ?, ?, ?)",
-		emp.Name, emp.Email, emp.Role, emp.Phone, emp.Alamat,
+		"INSERT INTO employees (name, email, position, role, phone, alamat) VALUES (?, ?, ?, ?, ?, ?)",
+		emp.Name, emp.Email, emp.Position, emp.Role, emp.Phone, emp.Alamat,
 	)
 	if err != nil {
 		log.Printf("Insert error: %v", err)
@@ -442,8 +443,8 @@ func updateEmployee(w http.ResponseWriter, r *http.Request, id int) {
 	}
 
 	_, err := config.DB.Exec(
-		"UPDATE employees SET name=?, email=?, role=?, phone=?, alamat=? WHERE id=? AND deleted_at IS NULL",
-		emp.Name, emp.Email, emp.Role, emp.Phone, emp.Alamat, id,
+		"UPDATE employees SET name=?, email=?, position=?, role=?, phone=?, alamat=? WHERE id=? AND deleted_at IS NULL",
+		emp.Name, emp.Email, emp.Position, emp.Role, emp.Phone, emp.Alamat, id,
 	)
 	if err != nil {
 		log.Printf("Update error: %v", err)

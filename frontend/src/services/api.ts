@@ -14,9 +14,11 @@ export interface Employee {
   name: string;
   email: string;
   role: string;
+  position: string;
   phone: string;
   alamat: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export const getEmployees = async (): Promise<Employee[]> => {

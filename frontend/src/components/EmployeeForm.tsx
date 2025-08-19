@@ -23,9 +23,10 @@ const EmployeeForm: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Omit<Employee, 'id' | 'created_at'>>({
+  const [formData, setFormData] = useState<Omit<Employee, 'id' | 'created_at' | 'updated_at'>>({
     name: '',
     email: '',
+    position: '',
     role: '',
     phone: '',
     alamat: '',
@@ -66,8 +67,8 @@ const EmployeeForm: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
-    const { name, email, role, phone, alamat } = formData;
-    if (!name.trim() || !email.trim() || !role || !phone.trim() || !alamat.trim()) {
+    const { name, email, position, role, phone, alamat } = formData;
+    if (!name.trim() || !email.trim() || !position.trim() || !role || !phone.trim() || !alamat.trim()) {
       setError('All fields are required');
       return false;
     }
@@ -147,6 +148,18 @@ const EmployeeForm: React.FC = () => {
             name="email"
             type="email"
             value={formData.email}
+            onChange={handleChange}
+            margin="normal"
+            required
+          />
+        </Box>
+
+        <Box mb={2}>
+          <TextField
+            fullWidth
+            label="Position"
+            name="position"
+            value={formData.position}
             onChange={handleChange}
             margin="normal"
             required

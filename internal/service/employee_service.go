@@ -58,6 +58,10 @@ func validateEmployee(employee *domain.Employee) error {
 		return errors.New("invalid email format")
 	}
 
+	if strings.TrimSpace(employee.Position) == "" {
+		return errors.New("position is required")
+	}
+
 	if strings.TrimSpace(employee.Role) == "" {
 		return errors.New("role is required")
 	}
