@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Edit Karyawan</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
+        />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/css/style.css" />
+    </head>
+    <body>
+        <nav class="navbar is-primary">
+            <div class="navbar-brand">
+                <a class="navbar-item has-text-weight-bold" href="/">
+                    🏢 KaryawanApp
+                </a>
+            </div>
+        </nav>
+
+        <div class="container is-fluid mt-5">
+            <div class="columns">
+                <div class="column is-2">
+                    <aside class="menu">
+                        <p class="menu-label">Menu</p>
+                        <ul class="menu-list">
+                            <li>
+                                <a href="/">
+                                    <span class="icon">
+                                        <i class="fas fa-arrow-left"></i>
+                                    </span>
+                                    <span>Kembali ke Daftar</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/create.html">
+                                    <span class="icon">
+                                        <i class="fas fa-plus"></i>
+                                    </span>
+                                    <span>Tambah Baru</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </aside>
+                </div>
+
+                <div class="column is-8">
+                    <div class="content">
+                        <h1 class="title has-text-centered">
+                            <span class="icon">
+                                <i class="fas fa-edit"></i>
+                            </span>
+                            <span>Edit Karyawan</span>
+                        </h1>
+                        <p class="has-text-centered has-text-grey-light mb-5">
+                            Perbarui informasi karyawan di bawah ini
+                        </p>
+                    </div>
+                    
+                    <div id="notification-container"></div>
+                    
+                    <div class="box">
+                        <form id="edit-form">
+                        <input type="hidden" id="emp-id" />
+                        
+                        <div class="field">
+                            <label class="label">Nama <span class="has-text-danger">*</span></label>
+                            <div class="control has-icons-left">
+                                <input
+                                    class="input"
+                                    type="text"
+                                    id="name"
+                                    required
+                                    minlength="2"
+                                />
+                                <span class="icon is-left">
+                                    <i class="fas fa-user"></i>
+                                </span>
+                            </div>
+                            <p class="help">Nama minimal 2 karakter</p>
+                        </div>
+                        
+                        <div class="field">
+                            <label class="label">Email <span class="has-text-danger">*</span></label>
+                            <div class="control has-icons-left">
+                                <input
+                                    class="input"
+                                    type="email"
+                                    id="email"
+                                    required
+                                />
+                                <span class="icon is-left">
+                                    <i class="fas fa-envelope"></i>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="field">
+                            <label class="label">Role <span class="has-text-danger">*</span></label>
+                            <div class="control has-icons-left">
+                                <div class="select is-fullwidth">
+                                    <select id="role" required>
+                                        <option value="">Pilih Role</option>
+                                        <option value="Manager">Manager</option>
+                                        <option value="Developer">Developer</option>
+                                        <option value="Designer">Designer</option>
+                                        <option value="HR">HR</option>
+                                        <option value="Marketing">Marketing</option>
+                                        <option value="Sales">Sales</option>
+                                        <option value="Admin">Admin</option>
+                                    </select>
+                                </div>
+                                <span class="icon is-left">
+                                    <i class="fas fa-briefcase"></i>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="field">
+                            <label class="label">Telepon <span class="has-text-danger">*</span></label>
+                            <div class="control has-icons-left">
+                                <input
+                                    class="input"
+                                    type="tel"
+                                    id="phone"
+                                    required
+                                    pattern="[0-9+\-\s()]+"
+                                />
+                                <span class="icon is-left">
+                                    <i class="fas fa-phone"></i>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="field">
+                            <label class="label">Alamat <span class="has-text-danger">*</span></label>
+                            <div class="control has-icons-left">
+                                <textarea
+                                    class="textarea"
+                                    id="alamat"
+                                    required
+                                    minlength="10"
+                                    rows="3"
+                                ></textarea>
+                                <span class="icon is-left">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                </span>
+                            </div>
+                            <p class="help">Alamat minimal 10 karakter</p>
+                        </div>
+                        
+                        <div class="field is-grouped is-grouped-centered mt-4">
+                            <div class="control">
+                                <button type="submit" class="button is-success is-medium" id="submit-btn">
+                                    <span class="icon">
+                                        <i class="fas fa-save"></i>
+                                    </span>
+                                    <span>Update Karyawan</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <a href="/" class="button is-light is-medium">
+                                    <span class="icon">
+                                        <i class="fas fa-times"></i>
+                                    </span>
+                                    <span>Batal</span>
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            class EditEmployeeForm {
+                constructor() {
+                    this.form = document.getElementById("edit-form");
+                    this.submitBtn = document.getElementById("submit-btn");
+                    this.notificationContainer = document.getElementById("notification-container");
+                    this.employeeId = null;
+                    this.init();
+                }
+
+                init() {
+                    this.loadEmployeeId();
+                    this.loadEmployeeData();
+                    this.form.addEventListener("submit", (e) => this.handleSubmit(e));
+                }
+
+                loadEmployeeId() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    this.employeeId = urlParams.get("id");
+
+                    if (!this.employeeId) {
+                        this.showNotification("ID karyawan tidak valid!", "danger");
+                        setTimeout(() => {
+                            window.location.href = "/";
+                        }, 2000);
+                    }
+                }
+
+                async loadEmployeeData() {
+                    try {
+                        this.showLoading();
+                        
+                        const response = await fetch(`/api/employees/${this.employeeId}`);
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.message || 'Gagal memuat data karyawan');
+                        }
+                        
+                        const emp = await response.json();
+                        this.populateForm(emp);
+                        
+                    } catch (error) {
+                        console.error('Error loading employee:', error);
+                        this.showNotification(error.message || 'Gagal memuat data karyawan', 'danger');
+                        setTimeout(() => {
+                            window.location.href = "/";
+                        }, 3000);
+                    } finally {
+                        this.hideLoading();
+                    }
+                }
+
+                populateForm(emp) {
+                    document.getElementById("emp-id").value = emp.id;
+                    document.getElementById("name").value = emp.name;
+                    document.getElementById("email").value = emp.email;
+                    document.getElementById("role").value = emp.role;
+                    document.getElementById("phone").value = emp.phone;
+                    document.getElementById("alamat").value = emp.alamat;
+                }
+
+                showLoading() {
+                    this.submitBtn.classList.add("is-loading");
+                    this.submitBtn.disabled = true;
+                }
+
+                hideLoading() {
+                    this.submitBtn.classList.remove("is-loading");
+                    this.submitBtn.disabled = false;
+                }
+
+                showNotification(message, type = 'info') {
+                    const notification = document.createElement('div');
+                    notification.className = `notification is-${type} is-light`;
+                    notification.innerHTML = `
+                        <button class="delete" onclick="this.parentElement.remove()"></button>
+                        ${message}
+                    `;
+                    
+                    this.notificationContainer.innerHTML = '';
+                    this.notificationContainer.appendChild(notification);
+                    
+                    // Auto remove after 5 seconds
+                    setTimeout(() => {
+                        if (notification.parentElement) {
+                            notification.remove();
+                        }
+                    }, 5000);
+                }
+
+                validateForm() {
+                    const name = document.getElementById("name").value.trim();
+                    const email = document.getElementById("email").value.trim();
+                    const role = document.getElementById("role").value;
+                    const phone = document.getElementById("phone").value.trim();
+                    const alamat = document.getElementById("alamat").value.trim();
+
+                    if (name.length < 2) {
+                        this.showNotification('Nama minimal 2 karakter', 'danger');
+                        return false;
+                    }
+
+                    if (!this.isValidEmail(email)) {
+                        this.showNotification('Format email tidak valid', 'danger');
+                        return false;
+                    }
+
+                    if (!role) {
+                        this.showNotification('Pilih role karyawan', 'danger');
+                        return false;
+                    }
+
+                    if (!phone) {
+                        this.showNotification('Nomor telepon wajib diisi', 'danger');
+                        return false;
+                    }
+
+                    if (alamat.length < 10) {
+                        this.showNotification('Alamat minimal 10 karakter', 'danger');
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                isValidEmail(email) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    return emailRegex.test(email);
+                }
+
+                async handleSubmit(e) {
+                    e.preventDefault();
+
+                    if (!this.validateForm()) {
+                        return;
+                    }
+
+                    const updatedEmp = {
+                        name: document.getElementById("name").value.trim(),
+                        email: document.getElementById("email").value.trim(),
+                        role: document.getElementById("role").value,
+                        phone: document.getElementById("phone").value.trim(),
+                        alamat: document.getElementById("alamat").value.trim(),
+                    };
+
+                    try {
+                        this.showLoading();
+                        
+                        const response = await fetch(`/api/employees/${this.employeeId}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(updatedEmp),
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.message || 'Gagal memperbarui karyawan');
+                        }
+
+                        this.showNotification("Karyawan berhasil diperbarui!", "success");
+                        
+                        // Redirect after 2 seconds
+                        setTimeout(() => {
+                            window.location.href = "/";
+                        }, 2000);
+
+                    } catch (error) {
+                        console.error('Error updating employee:', error);
+                        this.showNotification(error.message || 'Gagal memperbarui karyawan', 'danger');
+                    } finally {
+                        this.hideLoading();
+                    }
+                }
+            }
+
+            // Initialize form when DOM is loaded
+            document.addEventListener("DOMContentLoaded", () => {
+                new EditEmployeeForm();
+            });
+        </script>
+    </body>
+</html>

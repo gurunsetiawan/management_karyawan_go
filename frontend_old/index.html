@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Karyawan App</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
+        />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/css/style.css" />
+    </head>
+    <body>
+        <!-- Navbar -->
+        <nav class="navbar is-primary" role="navigation">
+            <div class="navbar-brand">
+                <a class="navbar-item has-text-weight-bold" href="/">
+                    🏢 KaryawanApp
+                </a>
+            </div>
+            <div class="navbar-menu">
+                <div class="navbar-end">
+                    <a class="navbar-item" href="/">
+                        <span class="icon">
+                            <i class="fas fa-home"></i>
+                        </span>
+                        <span>Dashboard</span>
+                    </a>
+                    <a class="navbar-item" href="/create.html">
+                        <span class="icon">
+                            <i class="fas fa-plus"></i>
+                        </span>
+                        <span>Tambah Karyawan</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Sidebar + Content -->
+        <div class="container is-fluid mt-5">
+            <div class="columns">
+                <!-- Sidebar -->
+                <div class="column is-2">
+                    <aside class="menu">
+                        <p class="menu-label">Navigasi</p>
+                        <ul class="menu-list">
+                            <li>
+                                <a href="/" class="is-active">
+                                    <span class="icon">
+                                        <i class="fas fa-list"></i>
+                                    </span>
+                                    <span>Daftar Karyawan</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="/create.html">
+                                    <span class="icon">
+                                        <i class="fas fa-user-plus"></i>
+                                    </span>
+                                    <span>Tambah Karyawan</span>
+                                </a>
+                            </li>
+                        </ul>
+                        <p class="menu-label mt-4">Info</p>
+                        <ul class="menu-list">
+                            <li>
+                                <a>
+                                    <span class="icon">
+                                        <i class="fas fa-users"></i>
+                                    </span>
+                                    <span>Jumlah: <strong id="total-count">0</strong></span>
+                                </a>
+                            </li>
+                        </ul>
+                    </aside>
+                </div>
+
+                <!-- Main Content -->
+                <div class="column is-10">
+                    <h1 class="title">
+                        <span class="icon">
+                            <i class="fas fa-users"></i>
+                        </span>
+                        <span>Manajemen Karyawan</span>
+                    </h1>
+                    <p class="subtitle">Kelola data karyawan dengan mudah.</p>
+
+                    <!-- Search and Filter Section -->
+                    <div class="box">
+                        <div class="columns is-multiline">
+                            <div class="column is-6">
+                                <div class="field">
+                                    <label class="label">
+                                        <span class="icon">
+                                            <i class="fas fa-search"></i>
+                                        </span>
+                                        <span>Cari Karyawan</span>
+                                    </label>
+                                    <div class="control has-icons-left">
+                                        <input 
+                                            class="input" 
+                                            type="text" 
+                                            id="search-input" 
+                                            placeholder="Cari berdasarkan nama, email, role, atau telepon..."
+                                        />
+                                        <span class="icon is-left">
+                                            <i class="fas fa-search"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label">
+                                        <span class="icon">
+                                            <i class="fas fa-filter"></i>
+                                        </span>
+                                        <span>Filter Role</span>
+                                    </label>
+                                    <div class="control">
+                                        <div class="select is-fullwidth">
+                                            <select id="role-filter">
+                                                <option value="all">Semua Role</option>
+                                                <option value="Manager">Manager</option>
+                                                <option value="Developer">Developer</option>
+                                                <option value="Designer">Designer</option>
+                                                <option value="HR">HR</option>
+                                                <option value="Marketing">Marketing</option>
+                                                <option value="Sales">Sales</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label">&nbsp;</label>
+                                    <div class="control">
+                                        <button class="button is-info is-fullwidth" onclick="location.reload()">
+                                            <span class="icon">
+                                                <i class="fas fa-refresh"></i>
+                                            </span>
+                                            <span>Refresh</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Employee Table -->
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-striped is-hoverable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nama</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Telepon</th>
+                                    <th>Alamat</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employee-table-body">
+                                <!-- Diisi oleh JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="/assets/js/app.js"></script>
+    </body>
+</html>

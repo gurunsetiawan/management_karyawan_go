@@ -1,0 +1,88 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Environment files
+.env
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Frontend specific
+frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/build/
+frontend/coverage/
+
+# Logs
+logs
+*.log
+
+# Local development
+*.local
+
+# Debug files
+*.dap
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Go workspace file
+go.work
+
+# Local environment files
+.env.*.local
+
+# Binaries
+bin/
+
+# Frontend build
+dist/
+
+# Coverage files
+coverage/
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Local development
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
