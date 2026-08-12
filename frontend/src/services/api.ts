@@ -92,8 +92,8 @@ class ApiService {
   }
 
   // Employee methods
-  public async getEmployees(): Promise<Employee[]> {
-    return this.get<Employee[]>('/api/employees');
+  public async getEmployees(page: number = 1, limit: number = 10): Promise<PaginatedEmployeeResponse> {
+    return this.get<PaginatedEmployeeResponse>(`/api/employees?page=${page}&limit=${limit}`);
   }
 
   public async getEmployee(id: number): Promise<Employee> {
@@ -143,6 +143,18 @@ export interface Employee {
   role?: string;
   created_at: string;
   updated_at?: string;
+}
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+}
+
+export interface PaginatedEmployeeResponse {
+  data: Employee[];
+  meta: PaginationMeta;
 }
 
 export interface ApiResponse<T = any> {
