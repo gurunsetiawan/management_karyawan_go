@@ -30,6 +30,8 @@ func GenerateDummyData() {
 
 // RunDummyDataGenerator can be called to generate dummy data
 func RunDummyDataGenerator() {
-	config.ConnectDB()
+	if err := config.ConnectDB(); err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
 	GenerateDummyData()
 }

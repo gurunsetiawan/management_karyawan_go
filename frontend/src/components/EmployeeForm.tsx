@@ -15,7 +15,7 @@ import {
   IconButton,
 } from '@mui/material';
 import { Save, ArrowBack } from '@mui/icons-material';
-import { getEmployee, createEmployee, updateEmployee, Employee } from '../services/api';
+import api, { Employee } from '../services/api';
 
 const EmployeeForm: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -33,13 +33,14 @@ const EmployeeForm: React.FC = () => {
   });
 
   useEffect(() => {
-    if (!isEdit) return;
-
     const fetchEmployee = async () => {
+      if (!id) return;
       try {
-        const employee = await getEmployee(parseInt(id!));
-        const { id: _, created_at, ...employeeData } = employee;
-        setFormData(employeeData);
+        const employee = await api.getEmployee(parseInt(id));
+        if (employee) {
+          const { id: _, created_at, updated_at, ...employeeData } = employee;
+          setFormData(employeeData);
+        }
       } catch (err) {
         setError('Failed to fetch employee data');
         console.error(err);
@@ -49,7 +50,7 @@ const EmployeeForm: React.FC = () => {
     };
 
     fetchEmployee();
-  }, [id, isEdit]);
+  }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -89,10 +90,16 @@ const EmployeeForm: React.FC = () => {
 
     try {
       setLoading(true);
-      if (isEdit) {
-        await updateEmployee(parseInt(id!), formData);
+      if (isEdit && id) {
+        await api.updateEmployee(parseInt(id), formData);
       } else {
-        await createEmployee(formData);
+        // Ensure required fields are included when creating a new employee
+        const newEmployee = {
+          ...formData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        await api.createEmployee(newEmployee);
       }
       navigate('/');
     } catch (err) {

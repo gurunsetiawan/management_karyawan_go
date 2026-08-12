@@ -1,136 +1,181 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
-	_ "github.com/go-sql-driver/mysql"
 
+	"karyawan-app/config"
 	handler "karyawan-app/internal/handler"
+	middleware "karyawan-app/internal/middleware"
 	repo "karyawan-app/internal/repository"
 	service "karyawan-app/internal/service"
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Printf("Warning: .env file not found, using environment variables")
+	// Initialize database connection using shared config
+	if err := config.ConnectDB(); err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	defer func() {
+		if config.DB != nil {
+			if err := config.DB.Close(); err != nil {
+				log.Printf("Warning: Failed to close database connection: %v", err)
+			}
+		}
+	}()
 
-	// Initialize database connection
-	db := initDB()
-	defer db.Close()
+	// Initialize repositories
+	employeeRepo := repo.NewEmployeeRepository(config.DB)
+	userRepo := repo.NewUserRepository(config.DB)
 
-	// Initialize repository, service, and handler
-	employeeRepo := repo.NewEmployeeRepository(db)
+	// Initialize services
 	employeeService := service.NewEmployeeService(employeeRepo)
+	authService := service.NewAuthService(userRepo)
+
+	// Initialize handlers
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
+	authHandler := handler.NewAuthHandler(authService)
 
 	// Create router
 	r := mux.NewRouter()
 
-	// Apply middleware
-	middleware := handler.NewChain(
-		handler.CORSMiddleware,
-		handler.RateLimitMiddleware(100), // 100 requests per minute
-		handler.LoggingMiddleware,
-		handler.JSONContentTypeMiddleware,
-	)
+	// Apply global middleware to all routes
+	r.Use(mux.MiddlewareFunc(handler.CORSMiddleware))
+	r.Use(mux.MiddlewareFunc(handler.RateLimitMiddleware(getRateLimitConfig())))
+	r.Use(mux.MiddlewareFunc(handler.LoggingMiddleware))
+	r.Use(mux.MiddlewareFunc(handler.JSONContentTypeMiddleware))
 
-	// Register routes
-	api := r.PathPrefix("/api").Subrouter()
-	employeeHandler.RegisterRoutes(api)
+	// Public routes (no authentication required)
+	publicRouter := r.PathPrefix("/api").Subrouter()
+	
+	// Auth routes - login is public
+	publicRouter.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
+	
+	// Health check - public
+	publicRouter.HandleFunc("/health", healthCheckHandler).Methods("GET")
 
-	// Serve static files from the frontend directory
-	frontendDir := "./frontend"
+	// Protected routes (require authentication)
+	protectedRouter := r.PathPrefix("/api").Subrouter()
+	protectedRouter.Use(mux.MiddlewareFunc(middleware.AuthMiddleware))
+	
+	// Auth routes - profile requires auth
+	protectedRouter.HandleFunc("/auth/profile", authHandler.GetProfile).Methods("GET")
+	
+	// Employee routes - protected by default
+	// Note: You can remove this line to make employee routes public
+	// Currently employees API requires authentication
+	protectedRouter.HandleFunc("/employees", employeeHandler.GetAllEmployees).Methods("GET")
+	protectedRouter.HandleFunc("/employees/{id}", employeeHandler.GetEmployee).Methods("GET")
+	protectedRouter.HandleFunc("/employees", employeeHandler.CreateEmployee).Methods("POST")
+	protectedRouter.HandleFunc("/employees/{id}", employeeHandler.UpdateEmployee).Methods("PUT")
+	protectedRouter.HandleFunc("/employees/{id}", employeeHandler.DeleteEmployee).Methods("DELETE")
+
+	// Admin routes (require admin role)
+	adminRouter := r.PathPrefix("/api/admin").Subrouter()
+	adminRouter.Use(mux.MiddlewareFunc(middleware.AuthMiddleware))
+	adminRouter.Use(mux.MiddlewareFunc(middleware.RoleMiddleware("admin")))
+	
+	// Example admin route
+	adminRouter.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`{"message":"Admin area accessed successfully"}`)); err != nil {
+			log.Printf("Error writing admin response: %v", err)
+		}
+	}).Methods("GET")
+
+	// Serve static files from the frontend/build directory
+	frontendDir := "./frontend/build"
 	if _, err := os.Stat(frontendDir); !os.IsNotExist(err) {
 		r.PathPrefix("/").Handler(http.FileServer(http.Dir(frontendDir)))
+	} else {
+		// Fallback to frontend directory for development
+		frontendDevDir := "./frontend"
+		if _, err := os.Stat(frontendDevDir); !os.IsNotExist(err) {
+			r.PathPrefix("/").Handler(http.FileServer(http.Dir(frontendDevDir)))
+		}
 	}
 
-	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	// Server configuration
+	port := getEnv("PORT", "8080")
+	host := getEnv("HOST", "127.0.0.1")
+	serverAddr := host + ":" + port
 
 	server := &http.Server{
-		Addr:         ":" + port,
-		Handler:      middleware.Then(r),
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:         serverAddr,
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Printf("Server starting on port %s\n", port)
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Error starting server: %v\n", err)
+	// Start server in a goroutine
+	go func() {
+		log.Printf("Server starting on http://%s", serverAddr)
+		log.Println("")
+		log.Println("===========================================")
+		log.Println("API Endpoints:")
+		log.Println("  POST /api/auth/login    - Login")
+		log.Println("  GET  /api/auth/profile  - Get Profile (protected)")
+		log.Println("  GET  /api/employees     - Get Employees (protected)")
+		log.Println("  GET  /api/health        - Health Check")
+		log.Println("===========================================")
+		log.Println("")
+		
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal for graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+
+	// Give outstanding requests 30 seconds to complete
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server stopped")
+}
+
+// healthCheckHandler returns a simple health check response
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response := `{"status":"healthy","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`
+	if _, err := w.Write([]byte(response)); err != nil {
+		log.Printf("Error writing health check response: %v", err)
 	}
 }
 
-func initDB() *sql.DB {
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASSWORD")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
-
-	// Default values if not set
-	if dbUser == "" {
-		dbUser = "root"
+// getRateLimitConfig returns the rate limit configuration from environment
+func getRateLimitConfig() int {
+	if rateLimit := os.Getenv("RATE_LIMIT_REQUESTS"); rateLimit != "" {
+		if rate, err := strconv.Atoi(rateLimit); err == nil && rate > 0 {
+			return rate
+		}
 	}
-	if dbHost == "" {
-		dbHost = "localhost"
-	}
-	if dbPort == "" {
-		dbPort = "3306"
-	}
-	if dbName == "" {
-		dbName = "karyawan_db"
-	}
-
-	dsn := dbUser + ":" + dbPass + "@tcp(" + dbHost + ":" + dbPort + ")/" + dbName + "?parseTime=true"
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		log.Fatalf("Error connecting to database: %v", err)
-	}
-
-	// Test the connection
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Error pinging database: %v", err)
-	}
-
-	// Set connection pool settings
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	// Run migrations
-	runMigrations(db)
-
-	return db
+	return 100 // Default: 100 requests per minute
 }
 
-func runMigrations(db *sql.DB) {
-	// Create employees table if not exists
-	query := `
-	CREATE TABLE IF NOT EXISTS employees (
-		id INT AUTO_INCREMENT PRIMARY KEY,
-		name VARCHAR(100) NOT NULL,
-		email VARCHAR(100) NOT NULL UNIQUE,
-		role VARCHAR(50) NOT NULL,
-		phone VARCHAR(20) NOT NULL,
-		alamat TEXT NOT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-	`
-
-	if _, err := db.Exec(query); err != nil {
-		log.Fatalf("Error creating employees table: %v", err)
+// getEnv returns the value of the environment variable or the default value if not set
+func getEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
 	}
+	return defaultValue
 }
