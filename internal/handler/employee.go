@@ -27,9 +27,23 @@ func (h *EmployeeHandler) RegisterRoutes(router *mux.Router) {
 }
 
 func (h *EmployeeHandler) GetAllEmployees(w http.ResponseWriter, r *http.Request) {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
 	search := r.URL.Query().Get("search")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	} else if page > 100000 {
+		page = 100000
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
 
 	response, err := h.service.GetAllEmployees(page, limit, search)
 	if err != nil {

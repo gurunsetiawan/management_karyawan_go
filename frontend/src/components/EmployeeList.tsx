@@ -16,6 +16,7 @@ import {
   Phone as PhoneIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import api, { Employee } from '../services/api';
 
 // Extend the Employee interface to include required fields
@@ -51,10 +52,10 @@ const EmployeeList: React.FC = () => {
   ]);
 
   // Fetch employees on component mount
-  const fetchEmployees = useCallback(async (searchQuery: string = '') => {
+  const fetchEmployees = useCallback(async (searchQuery: string = '', signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const res = await api.getEmployees(paginationModel.page + 1, paginationModel.pageSize, searchQuery);
+      const res = await api.getEmployees(paginationModel.page + 1, paginationModel.pageSize, searchQuery, { signal });
       const typedEmployees = (res.data || []).map(emp => ({
         ...emp,
         role: emp.role || 'user'
@@ -62,6 +63,7 @@ const EmployeeList: React.FC = () => {
       setEmployees(typedEmployees);
       setRowCount(res.meta.total);
     } catch (error) {
+      if (axios.isCancel(error)) return;
       console.error('Error fetching employees:', error);
       setSnackbar({
         open: true,
@@ -74,10 +76,14 @@ const EmployeeList: React.FC = () => {
   }, [paginationModel.page, paginationModel.pageSize]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetchEmployees(searchTerm);
+      fetchEmployees(searchTerm, controller.signal);
     }, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [fetchEmployees, searchTerm]);
 
   // Event handlers
@@ -217,7 +223,10 @@ const EmployeeList: React.FC = () => {
               variant="outlined"
               placeholder="Cari karyawan..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPaginationModel(prev => ({ ...prev, page: 0 }));
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">

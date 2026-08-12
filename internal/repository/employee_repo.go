@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"karyawan-app/internal/domain"
@@ -15,6 +16,14 @@ func NewEmployeeRepository(db *sql.DB) domain.EmployeeRepository {
 	return &employeeRepository{db: db}
 }
 
+// escapeLike removes wildcard characters for exact match in LIKE
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "%", "\\%")
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
+}
+
 func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.Employee, int, error) {
 	// First get total count
 	var total int
@@ -23,7 +32,7 @@ func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.E
 	
 	if search != "" {
 		countQuery += ` AND (name LIKE ? OR email LIKE ?)`
-		searchParam := "%" + search + "%"
+		searchParam := "%" + escapeLike(search) + "%"
 		countArgs = append(countArgs, searchParam, searchParam)
 	}
 	
@@ -40,7 +49,7 @@ func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.E
 	
 	if search != "" {
 		query += ` AND (name LIKE ? OR email LIKE ?)`
-		searchParam := "%" + search + "%"
+		searchParam := "%" + escapeLike(search) + "%"
 		args = append(args, searchParam, searchParam)
 	}
 	
