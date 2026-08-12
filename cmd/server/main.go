@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"os/signal"
 	"strconv"
 	"syscall"
@@ -93,10 +94,18 @@ func main() {
 		}
 	}).Methods("GET")
 
-	// Serve static files from the frontend/build directory
+	// Serve static files from the frontend/build directory (SPA fallback support)
 	frontendDir := "./frontend/build"
 	if _, err := os.Stat(frontendDir); !os.IsNotExist(err) {
-		r.PathPrefix("/").Handler(http.FileServer(http.Dir(frontendDir)))
+		r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			path := filepath.Join(frontendDir, r.URL.Path)
+			_, err := os.Stat(path)
+			if os.IsNotExist(err) {
+				http.ServeFile(w, r, filepath.Join(frontendDir, "index.html"))
+				return
+			}
+			http.FileServer(http.Dir(frontendDir)).ServeHTTP(w, r)
+		})
 	} else {
 		// Fallback to frontend directory for development
 		frontendDevDir := "./frontend"
