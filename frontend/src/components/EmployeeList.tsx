@@ -51,10 +51,10 @@ const EmployeeList: React.FC = () => {
   ]);
 
   // Fetch employees on component mount
-  const fetchEmployees = useCallback(async () => {
+  const fetchEmployees = useCallback(async (searchQuery: string = '') => {
     try {
       setLoading(true);
-      const res = await api.getEmployees(paginationModel.page + 1, paginationModel.pageSize);
+      const res = await api.getEmployees(paginationModel.page + 1, paginationModel.pageSize, searchQuery);
       const typedEmployees = (res.data || []).map(emp => ({
         ...emp,
         role: emp.role || 'user'
@@ -74,8 +74,11 @@ const EmployeeList: React.FC = () => {
   }, [paginationModel.page, paginationModel.pageSize]);
 
   useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
+    const timer = setTimeout(() => {
+      fetchEmployees(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [fetchEmployees, searchTerm]);
 
   // Event handlers
   const handleDelete = async (id: number) => {
@@ -105,19 +108,6 @@ const EmployeeList: React.FC = () => {
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
-
-  // Filter employees based on search term
-  const filteredEmployees = useMemo(() => {
-    if (!searchTerm) return employees;
-
-    const term = searchTerm.toLowerCase();
-    return employees.filter(emp =>
-      emp.name.toLowerCase().includes(term) ||
-      (emp.position && emp.position.toLowerCase().includes(term)) ||
-      (emp.email && emp.email.toLowerCase().includes(term)) ||
-      (emp.phone && emp.phone.includes(term))
-    );
-  }, [employees, searchTerm]);
 
   // Table columns
   const columns: GridColDef[] = [

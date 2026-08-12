@@ -92,8 +92,15 @@ class ApiService {
   }
 
   // Employee methods
-  public async getEmployees(page: number = 1, limit: number = 10): Promise<PaginatedEmployeeResponse> {
-    return this.get<PaginatedEmployeeResponse>(`/api/employees?page=${page}&limit=${limit}`);
+  public async getEmployees(page: number = 1, limit: number = 10, search: string = ''): Promise<PaginatedEmployeeResponse> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    if (search) {
+      params.append('search', search);
+    }
+    return this.get<PaginatedEmployeeResponse>(`/api/employees?${params.toString()}`);
   }
 
   public async getEmployee(id: number): Promise<Employee> {

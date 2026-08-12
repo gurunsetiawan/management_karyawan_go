@@ -15,11 +15,19 @@ func NewEmployeeRepository(db *sql.DB) domain.EmployeeRepository {
 	return &employeeRepository{db: db}
 }
 
-func (r *employeeRepository) FindAll(page, limit int) ([]domain.Employee, int, error) {
+func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.Employee, int, error) {
 	// First get total count
 	var total int
 	countQuery := `SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL`
-	err := r.db.QueryRow(countQuery).Scan(&total)
+	var countArgs []interface{}
+	
+	if search != "" {
+		countQuery += ` AND (name LIKE ? OR email LIKE ?)`
+		searchParam := "%" + search + "%"
+		countArgs = append(countArgs, searchParam, searchParam)
+	}
+	
+	err := r.db.QueryRow(countQuery, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -27,8 +35,19 @@ func (r *employeeRepository) FindAll(page, limit int) ([]domain.Employee, int, e
 	// Calculate offset
 	offset := (page - 1) * limit
 
-	query := `SELECT id, name, email, position, role, phone, alamat, created_at, updated_at FROM employees WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT ? OFFSET ?`
-	rows, err := r.db.Query(query, limit, offset)
+	query := `SELECT id, name, email, position, role, phone, alamat, created_at, updated_at FROM employees WHERE deleted_at IS NULL`
+	var args []interface{}
+	
+	if search != "" {
+		query += ` AND (name LIKE ? OR email LIKE ?)`
+		searchParam := "%" + search + "%"
+		args = append(args, searchParam, searchParam)
+	}
+	
+	query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
+	
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, 0, err
 	}

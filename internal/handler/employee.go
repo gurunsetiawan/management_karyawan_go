@@ -29,8 +29,9 @@ func (h *EmployeeHandler) RegisterRoutes(router *mux.Router) {
 func (h *EmployeeHandler) GetAllEmployees(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	search := r.URL.Query().Get("search")
 
-	response, err := h.service.GetAllEmployees(page, limit)
+	response, err := h.service.GetAllEmployees(page, limit, search)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to fetch employees")
 		return

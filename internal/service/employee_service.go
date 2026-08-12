@@ -20,7 +20,7 @@ func NewEmployeeService(repo domain.EmployeeRepository) domain.EmployeeService {
 	return &employeeService{repo: repo}
 }
 
-func (s *employeeService) GetAllEmployees(page, limit int) (*domain.PaginatedEmployeeResponse, error) {
+func (s *employeeService) GetAllEmployees(page, limit int, search string) (*domain.PaginatedEmployeeResponse, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -28,7 +28,7 @@ func (s *employeeService) GetAllEmployees(page, limit int) (*domain.PaginatedEmp
 		limit = 10
 	}
 
-	data, total, err := s.repo.FindAll(page, limit)
+	data, total, err := s.repo.FindAll(page, limit, search)
 	if err != nil {
 		return nil, err
 	}
