@@ -41,11 +41,21 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Allow specific origins
 		allowedOrigins := []string{
-			"http://localhost:3000",  // React dev server
-			"http://localhost:8080",  // Alternative port
+			"http://localhost:3000",
+			"http://localhost:5173",  // Vite dev server
+			"http://localhost:8080",
+			"http://localhost:8083",  // Go server port
+			"http://127.0.0.1:8083",  // Go server port (IP)
 		}
 
 		origin := r.Header.Get("Origin")
+		
+		// If no Origin header is present, it's a same-origin request, allow it
+		if origin == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		allowed := false
 
 		// Check if the request origin is in the allowed origins
