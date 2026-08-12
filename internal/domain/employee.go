@@ -14,8 +14,20 @@ type Employee struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }
 
+type PaginationMeta struct {
+	Page       int `json:"page"`
+	Limit      int `json:"limit"`
+	Total      int `json:"total"`
+	TotalPages int `json:"total_pages"`
+}
+
+type PaginatedEmployeeResponse struct {
+	Data []Employee     `json:"data"`
+	Meta PaginationMeta `json:"meta"`
+}
+
 type EmployeeRepository interface {
-	FindAll() ([]Employee, error)
+	FindAll(page, limit int, search string) ([]Employee, int, error)
 	FindByID(id int) (*Employee, error)
 	Create(employee *Employee) error
 	Update(employee *Employee) error
@@ -23,7 +35,7 @@ type EmployeeRepository interface {
 }
 
 type EmployeeService interface {
-	GetAllEmployees() ([]Employee, error)
+	GetAllEmployees(page, limit int, search string) (*PaginatedEmployeeResponse, error)
 	GetEmployee(id int) (*Employee, error)
 	CreateEmployee(employee *Employee) error
 	UpdateEmployee(employee *Employee) error

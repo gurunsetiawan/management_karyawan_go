@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"karyawan-app/internal/domain"
@@ -15,11 +16,49 @@ func NewEmployeeRepository(db *sql.DB) domain.EmployeeRepository {
 	return &employeeRepository{db: db}
 }
 
-func (r *employeeRepository) FindAll() ([]domain.Employee, error) {
-	query := `SELECT id, name, email, position, role, phone, alamat, created_at, updated_at FROM employees ORDER BY created_at DESC`
-	rows, err := r.db.Query(query)
+// escapeLike removes wildcard characters for exact match in LIKE
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "%", "\\%")
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
+}
+
+func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.Employee, int, error) {
+	// First get total count
+	var total int
+	countQuery := `SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL`
+	var countArgs []interface{}
+	
+	if search != "" {
+		countQuery += ` AND (name LIKE ? OR email LIKE ?)`
+		searchParam := "%" + escapeLike(search) + "%"
+		countArgs = append(countArgs, searchParam, searchParam)
+	}
+	
+	err := r.db.QueryRow(countQuery, countArgs...).Scan(&total)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+
+	// Calculate offset
+	offset := (page - 1) * limit
+
+	query := `SELECT id, name, email, position, role, phone, alamat, created_at, updated_at FROM employees WHERE deleted_at IS NULL`
+	var args []interface{}
+	
+	if search != "" {
+		query += ` AND (name LIKE ? OR email LIKE ?)`
+		searchParam := "%" + escapeLike(search) + "%"
+		args = append(args, searchParam, searchParam)
+	}
+	
+	query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
+	
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -28,7 +67,7 @@ func (r *employeeRepository) FindAll() ([]domain.Employee, error) {
 		var e domain.Employee
 		var createdAtStr, updatedAtStr sql.NullString
 		if err := rows.Scan(&e.ID, &e.Name, &e.Email, &e.Position, &e.Role, &e.Phone, &e.Alamat, &createdAtStr, &updatedAtStr); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		// Convert string time to time.Time if needed
 		e.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr.String)
@@ -37,11 +76,16 @@ func (r *employeeRepository) FindAll() ([]domain.Employee, error) {
 		}
 		employees = append(employees, e)
 	}
-	return employees, nil
+	
+	if employees == nil {
+		employees = []domain.Employee{}
+	}
+	
+	return employees, total, nil
 }
 
 func (r *employeeRepository) FindByID(id int) (*domain.Employee, error) {
-	query := `SELECT id, name, email, position, role, phone, alamat, created_at, updated_at FROM employees WHERE id = ?`
+	query := `SELECT id, name, email, position, role, phone, alamat, created_at, updated_at FROM employees WHERE id = ? AND deleted_at IS NULL`
 	row := r.db.QueryRow(query, id)
 
 	var e domain.Employee
@@ -78,13 +122,14 @@ func (r *employeeRepository) Create(employee *domain.Employee) error {
 }
 
 func (r *employeeRepository) Update(employee *domain.Employee) error {
-	query := `UPDATE employees SET name=?, email=?, position=?, role=?, phone=?, alamat=?, updated_at=NOW() WHERE id=?`
+	query := `UPDATE employees SET name=?, email=?, position=?, role=?, phone=?, alamat=?, updated_at=NOW() WHERE id=? AND deleted_at IS NULL`
 	_, err := r.db.Exec(query, employee.Name, employee.Email, employee.Position, employee.Role, employee.Phone, employee.Alamat, employee.ID)
 	return err
 }
 
 func (r *employeeRepository) Delete(id int) error {
-	query := `DELETE FROM employees WHERE id=?`
+	// Soft delete - set deleted_at timestamp instead of actually deleting
+	query := `UPDATE employees SET deleted_at=NOW() WHERE id=? AND deleted_at IS NULL`
 	_, err := r.db.Exec(query, id)
 	return err
 }

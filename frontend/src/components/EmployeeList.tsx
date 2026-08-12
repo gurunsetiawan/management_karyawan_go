@@ -1,71 +1,110 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Box, Button, IconButton, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Typography, TextField,
-  TablePagination, Dialog, DialogTitle, DialogContent, DialogActions,
-  AppBar, Toolbar, Tooltip, Snackbar, Alert, CircularProgress
+  Box, Button, IconButton, TextField, AppBar, Toolbar,
+  Tooltip, Snackbar, Alert, LinearProgress, InputAdornment,
+  Typography, Paper, Grid
 } from '@mui/material';
-import {
-  Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
-  Person as PersonIcon, Work as WorkIcon, Email as EmailIcon,
-  Phone as PhoneIcon, Search as SearchIcon
-} from '@mui/icons-material';
 import { DataGrid, GridColDef, GridSortModel, GridToolbar } from '@mui/x-data-grid';
-import { getEmployees, deleteEmployee, Employee } from '../services/api';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Work as WorkIcon,
+  Search as SearchIcon,
+  Person as PersonIcon,
+  Email as EmailIcon,
+  Phone as PhoneIcon
+} from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import api, { Employee } from '../services/api';
+
+// Extend the Employee interface to include required fields
+type EmployeeWithRole = Omit<Employee, 'role'> & {
+  role: string;
+};
+
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error' | 'info' | 'warning';
+}
 
 const EmployeeList: React.FC = () => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const navigate = useNavigate();
+  
+  // State management
+  const [employees, setEmployees] = useState<EmployeeWithRole[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [openModal, setOpenModal] = useState<boolean>(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [snackbar, setSnackbar] = useState<SnackbarState>({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 10,
   });
+  const [rowCount, setRowCount] = useState<number>(0);
   const [sortModel, setSortModel] = useState<GridSortModel>([
     { field: 'name', sort: 'asc' },
   ]);
-  const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-
-  const fetchEmployees = async () => {
+  // Fetch employees on component mount
+  const fetchEmployees = useCallback(async (searchQuery: string = '', signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const data = await getEmployees();
-      setEmployees(data);
+      const res = await api.getEmployees(paginationModel.page + 1, paginationModel.pageSize, searchQuery, { signal });
+      const typedEmployees = (res.data || []).map(emp => ({
+        ...emp,
+        role: emp.role || 'user'
+      }));
+      setEmployees(typedEmployees);
+      setRowCount(res.meta.total);
     } catch (error) {
-      showSnackbar('Gagal memuat data karyawan', 'error');
+      if (axios.isCancel(error)) return;
       console.error('Error fetching employees:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to fetch employees',
+        severity: 'error',
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [paginationModel.page, paginationModel.pageSize]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchEmployees(searchTerm, controller.signal);
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [fetchEmployees, searchTerm]);
+
+  // Event handlers
   const handleDelete = async (id: number) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus karyawan ini?')) {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data karyawan ini?')) {
       try {
-        await deleteEmployee(id);
-        fetchEmployees();
+        await api.deleteEmployee(id);
+        await fetchEmployees();
         showSnackbar('Data karyawan berhasil dihapus', 'success');
       } catch (error) {
         showSnackbar('Gagal menghapus data karyawan', 'error');
-        console.error('Error deleting employee:', error);
       }
     }
   };
 
-  const handleEdit = (employee: Employee) => {
-    setSelectedEmployee(employee);
-    setOpenModal(true);
+  const handleEdit = (id: number) => {
+    navigate(`/employees/${id}/edit`);
   };
 
-  const handleCloseModal = () => {
-    setOpenModal(false);
-    setSelectedEmployee(null);
+  const handleAddNew = () => {
+    navigate('/employees/new');
   };
 
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
@@ -76,10 +115,11 @@ const EmployeeList: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  // Table columns
   const columns: GridColDef[] = [
-    { 
-      field: 'name', 
-      headerName: 'Nama', 
+    {
+      field: 'name',
+      headerName: 'Nama',
       flex: 1,
       renderHeader: () => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -88,9 +128,9 @@ const EmployeeList: React.FC = () => {
         </Box>
       )
     },
-    { 
-      field: 'position', 
-      headerName: 'Jabatan', 
+    {
+      field: 'position',
+      headerName: 'Jabatan',
       flex: 1,
       renderHeader: () => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -99,9 +139,9 @@ const EmployeeList: React.FC = () => {
         </Box>
       )
     },
-    { 
-      field: 'email', 
-      headerName: 'Email', 
+    {
+      field: 'email',
+      headerName: 'Email',
       flex: 1,
       renderHeader: () => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -110,9 +150,9 @@ const EmployeeList: React.FC = () => {
         </Box>
       )
     },
-    { 
-      field: 'phone', 
-      headerName: 'Telepon', 
+    {
+      field: 'phone',
+      headerName: 'Telepon',
       flex: 1,
       renderHeader: () => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -125,29 +165,31 @@ const EmployeeList: React.FC = () => {
       field: 'actions',
       headerName: 'Aksi',
       sortable: false,
-      width: 120,
+      width: 150,
       renderCell: (params) => (
-        <Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <Tooltip title="Edit">
             <IconButton
+              size="small"
               color="primary"
               onClick={(e) => {
                 e.stopPropagation();
-                handleEdit(params.row);
+                handleEdit((params.row as EmployeeWithRole).id);
               }}
             >
-              <EditIcon />
+              <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title="Hapus">
             <IconButton
+              size="small"
               color="error"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDelete(params.row.id);
+                handleDelete((params.row as EmployeeWithRole).id);
               }}
             >
-              <DeleteIcon />
+              <DeleteIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Box>
@@ -155,34 +197,18 @@ const EmployeeList: React.FC = () => {
     },
   ];
 
-  // Filter employees based on search term
-  const filteredEmployees = React.useMemo(() => {
-    if (!searchTerm) return employees;
-    
-    const term = searchTerm.toLowerCase();
-    return employees.filter(employee => 
-      employee.name?.toLowerCase().includes(term) ||
-      employee.position?.toLowerCase().includes(term) ||
-      employee.email?.toLowerCase().includes(term) ||
-      employee.phone?.toLowerCase().includes(term) ||
-      employee.role?.toLowerCase().includes(term) ||
-      employee.alamat?.toLowerCase().includes(term)
-    );
-  }, [employees, searchTerm]);
-
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppBar position="static" color="default" elevation={1}>
         <Toolbar>
-          <WorkIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Manajemen Karyawan
+            Daftar Karyawan
           </Typography>
           <Button
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
-            onClick={() => setOpenModal(true)}
+            onClick={handleAddNew}
           >
             Tambah Karyawan
           </Button>
@@ -190,180 +216,92 @@ const EmployeeList: React.FC = () => {
       </AppBar>
 
       <Box sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Paper sx={{ p: 2, mb: 2, display: 'flex', alignItems: 'center' }}>
-          <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
-          <TextField
-            fullWidth
-            variant="standard"
-            placeholder="Cari karyawan..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              disableUnderline: true,
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Cari karyawan..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPaginationModel(prev => ({ ...prev, page: 0 }));
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleAddNew}
+              startIcon={<AddIcon />}
+            >
+              Tambah Karyawan Baru
+            </Button>
+          </Grid>
+        </Grid>
+
+        <Paper sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          <DataGrid
+            rows={employees}
+            columns={columns}
+            rowCount={rowCount}
+            paginationMode="server"
+            pageSizeOptions={[5, 10, 25]}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            sortModel={sortModel}
+            onSortModelChange={setSortModel}
+            loading={loading}
+            disableColumnMenu
+            disableRowSelectionOnClick
+            autoHeight
+            slots={{
+              toolbar: GridToolbar,
+              loadingOverlay: () => <LinearProgress />,
+            }}
+            slotProps={{
+              toolbar: {
+                showQuickFilter: true,
+              },
             }}
             sx={{
-              '& .MuiInputBase-input': {
-                py: 1,
+              '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: 'primary.light',
+                color: 'primary.contrastText',
+              },
+              '& .MuiDataGrid-cell': {
+                borderBottom: '1px solid rgba(224, 224, 224, 1)',
               },
             }}
           />
         </Paper>
 
-        <Paper sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ height: '100%', width: '100%' }}>
-            <DataGrid
-              rows={filteredEmployees}
-              columns={columns}
-              pageSizeOptions={[5, 10, 25]}
-              paginationModel={paginationModel}
-              onPaginationModelChange={setPaginationModel}
-              sortModel={sortModel}
-              onSortModelChange={setSortModel}
-              loading={loading}
-              disableRowSelectionOnClick
-              slots={{
-                toolbar: GridToolbar,
-                loadingOverlay: LinearProgress as any,
-              }}
-              slotProps={{
-                toolbar: {
-                  showQuickFilter: true,
-                },
-              }}
-              localeText={{
-                // Rows
-                noRowsLabel: 'Tidak ada data',
-                noResultsOverlayLabel: 'Tidak ada hasil yang ditemukan.',
-                
-                // Toolbar
-                toolbarDensity: 'Ukuran',
-                toolbarDensityLabel: 'Ukuran',
-                toolbarDensityCompact: 'Kecil',
-                toolbarDensityStandard: 'Standar',
-                toolbarDensityComfortable: 'Nyaman',
-                toolbarFilters: 'Filter',
-                toolbarFiltersLabel: 'Tampilkan filter',
-                toolbarFiltersTooltipHide: 'Sembunyikan filter',
-                toolbarFiltersTooltipShow: 'Tampilkan filter',
-                toolbarExport: 'Ekspor',
-                toolbarExportCSV: 'Unduh sebagai CSV',
-                toolbarExportPrint: 'Cetak',
-                
-                // Filter
-                toolbarQuickFilterPlaceholder: 'Cari...',
-                
-                // Pagination
-                MuiTablePagination: {
-                  labelRowsPerPage: 'Baris per halaman:',
-                  labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) => 
-                    `${from}-${to} dari ${count !== -1 ? count : `lebih dari ${to}`}`,
-                },
-                
-                // Column menu
-                columnMenuLabel: 'Menu',
-                columnMenuShowColumns: 'Tampilkan kolom',
-                columnMenuFilter: 'Filter',
-                columnMenuHideColumn: 'Sembunyikan',
-                columnMenuUnsort: 'Batal urutkan',
-                columnMenuSortAsc: 'Urutkan A ke Z',
-                columnMenuSortDesc: 'Urutkan Z ke A',
-                
-                // Filter operators
-                filterOperatorContains: 'mengandung',
-                filterOperatorEquals: 'sama dengan',
-                filterOperatorStartsWith: 'dimulai dengan',
-                filterOperatorEndsWith: 'diakhiri dengan',
-                filterOperatorIsEmpty: 'kosong',
-                filterOperatorIsNotEmpty: 'tidak kosong',
-                filterOperatorIsAnyOf: 'salah satu dari',
-                
-                // Column header titles
-                columnHeaderSortIconLabel: 'Urutkan',
-              } as any}
-            />
-          </Box>
-        </Paper>
-      </Box>
-
-      {/* Add/Edit Modal */}
-      <Dialog open={openModal} onClose={handleCloseModal} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedEmployee ? 'Edit Karyawan' : 'Tambah Karyawan Baru'}
-        </DialogTitle>
-        <DialogContent>
-          <Box component="form" sx={{ mt: 2 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Nama"
-              name="name"
-              autoFocus
-              defaultValue={selectedEmployee?.name || ''}
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Jabatan"
-              name="position"
-              defaultValue={selectedEmployee?.position || ''}
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Email"
-              name="email"
-              type="email"
-              defaultValue={selectedEmployee?.email || ''}
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Telepon"
-              name="phone"
-              defaultValue={selectedEmployee?.phone || ''}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleCloseModal} color="inherit">
-            Batal
-          </Button>
-          <Button variant="contained" color="primary">
-            {selectedEmployee ? 'Simpan Perubahan' : 'Tambah'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
           onClose={handleCloseSnackbar}
-          severity={snackbar.severity as 'success' | 'error' | 'info' | 'warning'}
-          sx={{ width: '100%' }}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbar.severity}
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
     </Box>
   );
 };
-
-// Fallback component for loading overlay
-const LinearProgress = () => (
-  <div style={{ width: '100%', position: 'absolute', top: 0 }}>
-    <div style={{ height: '4px', backgroundColor: '#1976d2' }} />
-  </div>
-);
 
 export default EmployeeList;

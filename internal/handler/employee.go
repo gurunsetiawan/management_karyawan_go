@@ -27,12 +27,30 @@ func (h *EmployeeHandler) RegisterRoutes(router *mux.Router) {
 }
 
 func (h *EmployeeHandler) GetAllEmployees(w http.ResponseWriter, r *http.Request) {
-	employees, err := h.service.GetAllEmployees()
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+	search := r.URL.Query().Get("search")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	} else if page > 100000 {
+		page = 100000
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+
+	response, err := h.service.GetAllEmployees(page, limit, search)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to fetch employees")
 		return
 	}
-	respondWithJSON(w, http.StatusOK, employees)
+	respondWithJSON(w, http.StatusOK, response)
 }
 
 func (h *EmployeeHandler) GetEmployee(w http.ResponseWriter, r *http.Request) {
@@ -121,11 +139,15 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	if err != nil {
 		log.Printf("Error marshaling JSON: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
+		if _, writeErr := w.Write([]byte("Internal Server Error")); writeErr != nil {
+			log.Printf("Error writing response: %v", writeErr)
+		}
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	w.Write(response)
+	if _, writeErr := w.Write(response); writeErr != nil {
+		log.Printf("Error writing response: %v", writeErr)
+	}
 }
