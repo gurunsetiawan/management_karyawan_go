@@ -51,10 +51,10 @@ func main() {
 	r.Use(mux.MiddlewareFunc(handler.CORSMiddleware))
 	r.Use(mux.MiddlewareFunc(handler.RateLimitMiddleware(getRateLimitConfig())))
 	r.Use(mux.MiddlewareFunc(handler.LoggingMiddleware))
-	r.Use(mux.MiddlewareFunc(handler.JSONContentTypeMiddleware))
 
 	// Public routes (no authentication required)
 	publicRouter := r.PathPrefix("/api").Subrouter()
+	publicRouter.Use(mux.MiddlewareFunc(handler.JSONContentTypeMiddleware))
 	
 	// Auth routes - login is public
 	publicRouter.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
@@ -64,6 +64,7 @@ func main() {
 
 	// Protected routes (require authentication)
 	protectedRouter := r.PathPrefix("/api").Subrouter()
+	protectedRouter.Use(mux.MiddlewareFunc(handler.JSONContentTypeMiddleware))
 	protectedRouter.Use(mux.MiddlewareFunc(middleware.AuthMiddleware))
 	
 	// Auth routes - profile requires auth
@@ -80,6 +81,7 @@ func main() {
 
 	// Admin routes (require admin role)
 	adminRouter := r.PathPrefix("/api/admin").Subrouter()
+	adminRouter.Use(mux.MiddlewareFunc(handler.JSONContentTypeMiddleware))
 	adminRouter.Use(mux.MiddlewareFunc(middleware.AuthMiddleware))
 	adminRouter.Use(mux.MiddlewareFunc(middleware.RoleMiddleware("admin")))
 	
