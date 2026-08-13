@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Button, IconButton, TextField, AppBar, Toolbar,
   Tooltip, Snackbar, Alert, LinearProgress, InputAdornment,
-  Typography, Paper, Grid
+  Typography, Paper, Grid, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import { DataGrid, GridColDef, GridSortModel, GridToolbar } from '@mui/x-data-grid';
 import {
@@ -13,7 +13,8 @@ import {
   Search as SearchIcon,
   Person as PersonIcon,
   Email as EmailIcon,
-  Phone as PhoneIcon
+  Phone as PhoneIcon,
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -50,6 +51,9 @@ const EmployeeList: React.FC = () => {
   const [sortModel, setSortModel] = useState<GridSortModel>([
     { field: 'name', sort: 'asc' },
   ]);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
 
   // Fetch employees on component mount
   const fetchEmployees = useCallback(async (searchQuery: string = '', signal?: AbortSignal) => {
@@ -105,6 +109,62 @@ const EmployeeList: React.FC = () => {
 
   const handleAddNew = () => {
     navigate('/employees/new');
+  };
+
+  const handleDownloadTemplate = () => {
+    const csvContent = "Name,Email,Position,Role,Phone,Alamat\nJohn Doe,john@example.com,Software Engineer,admin,0812345678,Jakarta";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "employee_template.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setImportFile(e.target.files[0]);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      showSnackbar('Silakan pilih file CSV', 'warning');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+
+    try {
+      setImporting(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.post('http://127.0.0.1:8083/api/employees/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const { success_count, failures } = response.data;
+      if (failures && failures.length > 0) {
+        showSnackbar(`Berhasil: ${success_count}. Gagal: ${failures.length} baris (Cek console)`, 'warning');
+        console.warn("Import Failures:", failures);
+      } else {
+        showSnackbar(`Berhasil mengimpor ${success_count} karyawan!`, 'success');
+      }
+      
+      setImportDialogOpen(false);
+      setImportFile(null);
+      fetchEmployees(searchTerm);
+    } catch (err: any) {
+      showSnackbar(err.response?.data || 'Gagal mengimpor file', 'error');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
@@ -204,14 +264,6 @@ const EmployeeList: React.FC = () => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Daftar Karyawan
           </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={handleAddNew}
-          >
-            Tambah Karyawan
-          </Button>
         </Toolbar>
       </AppBar>
 
@@ -236,7 +288,15 @@ const EmployeeList: React.FC = () => {
               }}
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={() => setImportDialogOpen(true)}
+              startIcon={<CloudUploadIcon />}
+            >
+              Import CSV
+            </Button>
             <Button
               variant="contained"
               color="primary"
@@ -283,6 +343,35 @@ const EmployeeList: React.FC = () => {
             }}
           />
         </Paper>
+
+        {/* CSV Import Dialog */}
+        <Dialog open={importDialogOpen} onClose={() => !importing && setImportDialogOpen(false)}>
+          <DialogTitle>Import Data Karyawan</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Unggah file CSV dengan format kolom: Name, Email, Position, Role, Phone, Alamat.
+            </Typography>
+            <Button variant="text" onClick={handleDownloadTemplate} sx={{ mb: 2 }}>
+              Download Template CSV
+            </Button>
+            <Box>
+              <input
+                accept=".csv"
+                id="csv-upload"
+                type="file"
+                onChange={handleFileChange}
+                disabled={importing}
+              />
+            </Box>
+            {importing && <LinearProgress sx={{ mt: 2 }} />}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setImportDialogOpen(false)} disabled={importing}>Batal</Button>
+            <Button onClick={handleImport} variant="contained" disabled={!importFile || importing}>
+              Upload & Import
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Snackbar for notifications */}
         <Snackbar

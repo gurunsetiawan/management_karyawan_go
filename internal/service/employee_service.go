@@ -1,7 +1,10 @@
 package service
 
 import (
+	"encoding/csv"
 	"errors"
+	"fmt"
+	"io"
 	"regexp"
 	"strings"
 
@@ -131,4 +134,69 @@ func validateEmployee(employee *domain.Employee) error {
 
 func isValidEmail(email string) bool {
 	return emailRegex.MatchString(email)
+}
+
+// ImportCSV parses a CSV file and imports valid rows.
+// Returns success count, a list of failures, and error if the file itself is invalid.
+func (s *employeeService) ImportCSV(csvData io.Reader) (int, []string, error) {
+	reader := csv.NewReader(csvData)
+	
+	// Read header
+	header, err := reader.Read()
+	if err != nil {
+		if err == io.EOF {
+			return 0, nil, errors.New("file CSV kosong")
+		}
+		return 0, nil, errors.New("gagal membaca header CSV: " + err.Error())
+	}
+	
+	// Basic validation of header
+	if len(header) < 6 {
+		return 0, nil, errors.New("format CSV tidak valid: kurang kolom")
+	}
+
+	var successCount int
+	var failures []string
+	rowNum := 1 // Header is row 1
+
+	for {
+		row, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		rowNum++
+		
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("Baris %d: Gagal dibaca - %v", rowNum, err))
+			continue
+		}
+
+		if len(row) < 6 {
+			failures = append(failures, fmt.Sprintf("Baris %d: Jumlah kolom tidak sesuai", rowNum))
+			continue
+		}
+
+		emp := &domain.Employee{
+			Name:     strings.TrimSpace(row[0]),
+			Email:    strings.TrimSpace(row[1]),
+			Position: strings.TrimSpace(row[2]),
+			Role:     strings.TrimSpace(row[3]),
+			Phone:    strings.TrimSpace(row[4]),
+			Alamat:   strings.TrimSpace(row[5]),
+		}
+
+		if err := validateEmployee(emp); err != nil {
+			failures = append(failures, fmt.Sprintf("Baris %d: %v", rowNum, err))
+			continue
+		}
+
+		if err := s.repo.Create(emp); err != nil {
+			failures = append(failures, fmt.Sprintf("Baris %d: Gagal disimpan - %v", rowNum, err))
+			continue
+		}
+
+		successCount++
+	}
+
+	return successCount, failures, nil
 }

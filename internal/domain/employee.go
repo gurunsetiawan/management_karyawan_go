@@ -1,6 +1,7 @@
 package domain
 
 import "time"
+import "io"
 
 type Employee struct {
 	ID        int       `json:"id"`
@@ -40,4 +41,5 @@ type EmployeeService interface {
 	CreateEmployee(employee *Employee) error
 	UpdateEmployee(employee *Employee) error
 	DeleteEmployee(id int) error
+	ImportCSV(csvData io.Reader) (int, []string, error)
 }

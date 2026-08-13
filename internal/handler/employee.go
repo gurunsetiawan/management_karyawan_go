@@ -20,6 +20,7 @@ func NewEmployeeHandler(service domain.EmployeeService) *EmployeeHandler {
 
 func (h *EmployeeHandler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/employees", h.GetAllEmployees).Methods("GET")
+	router.HandleFunc("/employees/import", h.ImportEmployees).Methods("POST")
 	router.HandleFunc("/employees/{id}", h.GetEmployee).Methods("GET")
 	router.HandleFunc("/employees", h.CreateEmployee).Methods("POST")
 	router.HandleFunc("/employees/{id}", h.UpdateEmployee).Methods("PUT")
@@ -132,6 +133,36 @@ func (h *EmployeeHandler) DeleteEmployee(w http.ResponseWriter, r *http.Request)
 
 func respondWithError(w http.ResponseWriter, code int, message string) {
 	respondWithJSON(w, code, map[string]string{"error": message})
+}
+
+// ImportEmployees handles CSV file upload for employee import
+func (h *EmployeeHandler) ImportEmployees(w http.ResponseWriter, r *http.Request) {
+	// Limit file size to 10MB
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		http.Error(w, "Gagal membaca form data", http.StatusBadRequest)
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "File CSV tidak ditemukan dalam request", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	successCount, failures, err := h.service.ImportCSV(file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success_count": successCount,
+		"failures":      failures,
+		"message":       "Import selesai",
+	})
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {

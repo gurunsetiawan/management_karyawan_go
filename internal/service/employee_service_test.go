@@ -2,6 +2,8 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -216,5 +218,82 @@ func BenchmarkValidateEmployee(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_ = validateEmployee(employee)
+	}
+}
+
+// MockEmployeeRepo is a mock implementation of domain.EmployeeRepository
+type MockEmployeeRepo struct {
+	CreateFunc func(employee *domain.Employee) error
+}
+
+func (m *MockEmployeeRepo) FindAll(page, limit int, search string) ([]domain.Employee, int, error) {
+	return nil, 0, nil
+}
+func (m *MockEmployeeRepo) FindByID(id int) (*domain.Employee, error) { return nil, nil }
+func (m *MockEmployeeRepo) Create(employee *domain.Employee) error {
+	if m.CreateFunc != nil {
+		return m.CreateFunc(employee)
+	}
+	return nil
+}
+func (m *MockEmployeeRepo) Update(employee *domain.Employee) error { return nil }
+func (m *MockEmployeeRepo) Delete(id int) error                    { return nil }
+
+func TestImportCSV_EmptyFile(t *testing.T) {
+	mockRepo := &MockEmployeeRepo{}
+	svc := NewEmployeeService(mockRepo)
+
+	// Test 1: Empty file should return 0 success, 0 fails, but with an error
+	csvData := strings.NewReader("")
+	successCount, failures, err := svc.ImportCSV(csvData)
+
+	if err == nil {
+		t.Error("Expected error for empty CSV, got nil")
+	}
+	if successCount != 0 {
+		t.Errorf("Expected 0 successes, got %d", successCount)
+	}
+	if len(failures) != 0 {
+		t.Errorf("Expected 0 failures, got %d", len(failures))
+	}
+}
+
+func TestImportCSV_ValidAndInvalidRows(t *testing.T) {
+	var insertedCount int
+	mockRepo := &MockEmployeeRepo{
+		CreateFunc: func(employee *domain.Employee) error {
+			if employee.Email == "duplicate@example.com" {
+				return errors.New("email already exists")
+			}
+			insertedCount++
+			return nil
+		},
+	}
+	svc := NewEmployeeService(mockRepo)
+
+	// CSV Header: Name,Email,Position,Role,Phone,Alamat
+	csvContent := `Name,Email,Position,Role,Phone,Alamat
+Budi,budi@example.com,Manager,Admin,081234,Jakarta
+Tono,,Staff,User,082234,Bandung
+Andi,duplicate@example.com,Staff,User,083234,Surabaya
+`
+	csvData := strings.NewReader(csvContent)
+	successCount, failures, err := svc.ImportCSV(csvData)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	
+	// Expect 1 success (Budi)
+	if successCount != 1 {
+		t.Errorf("Expected 1 success, got %d", successCount)
+	}
+	if insertedCount != 1 {
+		t.Errorf("Expected repo.Create to be called exactly 1 time successfully, got %d", insertedCount)
+	}
+
+	// Expect 2 failures (Tono missing email, Andi duplicate email)
+	if len(failures) != 2 {
+		t.Errorf("Expected 2 failures, got %d", len(failures))
 	}
 }
