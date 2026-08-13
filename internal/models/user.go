@@ -20,7 +20,7 @@ type User struct {
 	RoleID       int       `json:"role_id"`
 	Role         *Role     `json:"role,omitempty" gorm:"foreignKey:RoleID"`
 	IsActive     bool      `json:"is_active"`
-	LastLogin    time.Time `json:"last_login,omitempty"`
+	LastLogin    *time.Time `json:"last_login,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -33,11 +33,11 @@ type UserLoginRequest struct {
 
 // UserResponse adalah struktur untuk response user (tanpa data sensitif)
 type UserResponse struct {
-	ID        int       `json:"id"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	IsActive  bool      `json:"is_active"`
-	LastLogin time.Time `json:"last_login,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        int        `json:"id"`
+	Username  string     `json:"username"`
+	Email     string     `json:"email"`
+	Role      string     `json:"role"`
+	IsActive  bool       `json:"is_active"`
+	LastLogin *time.Time `json:"last_login,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
