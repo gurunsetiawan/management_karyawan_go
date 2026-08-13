@@ -201,6 +201,6 @@ func (s *employeeService) ImportCSV(csvData io.Reader) (int, []string, error) {
 	return successCount, failures, nil
 }
 
-func (s *employeeService) ExportCSV() ([]byte, error) {
-	return s.repo.ExportCSV()
+func (s *employeeService) ExportCSV(writer io.Writer) error {
+	return s.repo.ExportCSV(writer)
 }

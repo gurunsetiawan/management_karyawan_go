@@ -1,8 +1,10 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -230,7 +232,7 @@ func (m *MockEmployeeRepo) FindAll(page, limit int, search, status string) ([]do
 	return nil, 0, nil
 }
 func (m *MockEmployeeRepo) FindByID(id int) (*domain.Employee, error) { return nil, nil }
-func (m *MockEmployeeRepo) ExportCSV() ([]byte, error) { return nil, nil }
+func (m *MockEmployeeRepo) ExportCSV(writer io.Writer) error { return nil }
 func (m *MockEmployeeRepo) Create(employee *domain.Employee) error {
 	if m.CreateFunc != nil {
 		return m.CreateFunc(employee)
@@ -303,7 +305,8 @@ func TestExportCSV(t *testing.T) {
 	mockRepo := &MockEmployeeRepo{}
 	svc := NewEmployeeService(mockRepo)
 
-	_, err := svc.ExportCSV()
+	var b bytes.Buffer
+	err := svc.ExportCSV(&b)
 	if err != nil {
 		t.Errorf("Expected nil error, got %v", err)
 	}

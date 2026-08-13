@@ -185,12 +185,12 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 }
 
 func (h *EmployeeHandler) ExportEmployees(w http.ResponseWriter, r *http.Request) {
-	data, err := h.service.ExportCSV()
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=employees.csv")
+	
+	err := h.service.ExportCSV(w)
 	if err != nil {
 		http.Error(w, "Failed to export data", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=employees.csv")
-	w.Write(data)
 }

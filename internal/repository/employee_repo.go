@@ -1,9 +1,9 @@
 package repository
 
 import (
-	"bytes"
-	"encoding/csv"
 	"database/sql"
+	"encoding/csv"
+	"io"
 	"strings"
 	"time"
 
@@ -136,25 +136,31 @@ func (r *employeeRepository) Delete(id int) error {
 	return err
 }
 
-func (r *employeeRepository) ExportCSV() ([]byte, error) {
-	query := "SELECT name, email, position, role, phone, alamat FROM employees WHERE is_deleted = false ORDER BY id ASC"
+func (r *employeeRepository) ExportCSV(writer io.Writer) error {
+	query := "SELECT name, email, position, role, phone, alamat FROM employees WHERE deleted_at IS NULL ORDER BY id ASC"
 	rows, err := r.db.Query(query)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
-	var b bytes.Buffer
-	writer := csv.NewWriter(&b)
-	writer.Write([]string{"Name", "Email", "Position", "Role", "Phone", "Alamat"})
+	csvWriter := csv.NewWriter(writer)
+	// Don't defer csvWriter.Flush(), just call it before returning
+	
+	if err := csvWriter.Write([]string{"Name", "Email", "Position", "Role", "Phone", "Alamat"}); err != nil {
+		return err
+	}
 
 	for rows.Next() {
 		var name, email, position, role, phone, alamat string
 		if err := rows.Scan(&name, &email, &position, &role, &phone, &alamat); err != nil {
-			return nil, err
+			return err
 		}
-		writer.Write([]string{name, email, position, role, phone, alamat})
+		if err := csvWriter.Write([]string{name, email, position, role, phone, alamat}); err != nil {
+			return err
+		}
 	}
-	writer.Flush()
-	return b.Bytes(), nil
+	
+	csvWriter.Flush()
+	return csvWriter.Error()
 }

@@ -33,7 +33,7 @@ type EmployeeRepository interface {
 	Create(employee *Employee) error
 	Update(employee *Employee) error
 	Delete(id int) error
-	ExportCSV() ([]byte, error)
+	ExportCSV(writer io.Writer) error
 }
 
 type EmployeeService interface {
@@ -43,5 +43,5 @@ type EmployeeService interface {
 	UpdateEmployee(employee *Employee) error
 	DeleteEmployee(id int) error
 	ImportCSV(reader io.Reader) (int, []string, error)
-	ExportCSV() ([]byte, error)
+	ExportCSV(writer io.Writer) error
 }
