@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   TextField,
   Button,
-  Paper,
+  Card,
   Typography,
   Box,
   CircularProgress,
@@ -13,6 +13,8 @@ import {
   Select,
   SelectChangeEvent,
   IconButton,
+  Alert,
+  Grid
 } from '@mui/material';
 import { Save, ArrowBack } from '@mui/icons-material';
 import api, { Employee } from '../services/api';
@@ -27,7 +29,7 @@ const EmployeeForm: React.FC = () => {
     name: '',
     email: '',
     position: '',
-    role: '',
+    role: 'karyawan',
     phone: '',
     alamat: '',
   });
@@ -42,7 +44,7 @@ const EmployeeForm: React.FC = () => {
           setFormData(employeeData);
         }
       } catch (err) {
-        setError('Failed to fetch employee data');
+        setError('Gagal mengambil data karyawan');
         console.error(err);
       } finally {
         setLoading(false);
@@ -70,13 +72,13 @@ const EmployeeForm: React.FC = () => {
   const validateForm = (): boolean => {
     const { name, email, position, role, phone, alamat } = formData;
     if (!name.trim() || !email.trim() || !position.trim() || !role || !phone.trim() || !alamat.trim()) {
-      setError('All fields are required');
+      setError('Semua kolom wajib diisi');
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
+      setError('Format email tidak valid');
       return false;
     }
 
@@ -85,6 +87,7 @@ const EmployeeForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (!validateForm()) return;
 
@@ -93,7 +96,6 @@ const EmployeeForm: React.FC = () => {
       if (isEdit && id) {
         await api.updateEmployee(parseInt(id), formData);
       } else {
-        // Ensure required fields are included when creating a new employee
         const newEmployee = {
           ...formData,
           created_at: new Date().toISOString(),
@@ -103,7 +105,7 @@ const EmployeeForm: React.FC = () => {
       }
       navigate('/');
     } catch (err) {
-      setError('Failed to save employee');
+      setError('Gagal menyimpan data karyawan');
       console.error(err);
     } finally {
       setLoading(false);
@@ -112,135 +114,135 @@ const EmployeeForm: React.FC = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" mt={4}>
+      <Box display="flex" justifyContent="center" mt={6}>
         <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <Paper sx={{ p: 3, maxWidth: 800, margin: '0 auto' }}>
-      <Box display="flex" alignItems="center" mb={3}>
-        <IconButton onClick={() => navigate(-1)} sx={{ mr: 1 }}>
-          <ArrowBack />
+    <Box sx={{ maxWidth: 800, mx: 'auto' }}>
+      <Box display="flex" alignItems="center" mb={3} gap={1}>
+        <IconButton onClick={() => navigate(-1)} size="small" sx={{ border: '1px solid', borderColor: 'divider' }}>
+          <ArrowBack fontSize="small" />
         </IconButton>
-        <Typography variant="h5">
-          {isEdit ? 'Edit Employee' : 'Add New Employee'}
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          {isEdit ? 'Edit Karyawan' : 'Tambah Karyawan Baru'}
         </Typography>
       </Box>
 
-      {error && (
-        <Box mb={2} p={1} bgcolor="error.light" borderRadius={1}>
-          <Typography color="error">{error}</Typography>
-        </Box>
-      )}
+      <Card sx={{ p: 4 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-      <form onSubmit={handleSubmit}>
-        <Box mb={2}>
-          <TextField
-            fullWidth
-            label="Name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            margin="normal"
-            required
-          />
-        </Box>
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={2.5}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                label="Nama Lengkap"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                size="small"
+              />
+            </Grid>
 
-        <Box mb={2}>
-          <TextField
-            fullWidth
-            label="Email"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            margin="normal"
-            required
-          />
-        </Box>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                label="Email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                size="small"
+              />
+            </Grid>
 
-        <Box mb={2}>
-          <TextField
-            fullWidth
-            label="Position"
-            name="position"
-            value={formData.position}
-            onChange={handleChange}
-            margin="normal"
-            required
-          />
-        </Box>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                label="Jabatan / Departemen"
+                name="position"
+                value={formData.position}
+                onChange={handleChange}
+                required
+                size="small"
+              />
+            </Grid>
 
-        <Box mb={2}>
-          <FormControl fullWidth margin="normal" required>
-            <InputLabel id="role-label">Role</InputLabel>
-            <Select
-              labelId="role-label"
-              name="role"
-              value={formData.role}
-              label="Role"
-              onChange={handleRoleChange}
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth size="small" required>
+                <InputLabel id="role-label">Role Akses</InputLabel>
+                <Select
+                  labelId="role-label"
+                  name="role"
+                  value={formData.role}
+                  label="Role Akses"
+                  onChange={handleRoleChange}
+                >
+                  <MenuItem value="karyawan">Karyawan</MenuItem>
+                  <MenuItem value="manager">Manager</MenuItem>
+                  <MenuItem value="admin">Admin</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                label="No. Telepon"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                size="small"
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                fullWidth
+                label="Alamat"
+                name="alamat"
+                value={formData.alamat}
+                onChange={handleChange}
+                multiline
+                rows={3}
+                required
+              />
+            </Grid>
+          </Grid>
+
+          <Box display="flex" justifyContent="flex-end" gap={1.5} mt={4}>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/')}
+              disabled={loading}
+              sx={{ px: 3 }}
             >
-              <MenuItem value="">
-                <em>Select Role</em>
-              </MenuItem>
-              <MenuItem value="Manager">Manager</MenuItem>
-              <MenuItem value="Developer">Developer</MenuItem>
-              <MenuItem value="Designer">Designer</MenuItem>
-              <MenuItem value="HR">HR</MenuItem>
-              <MenuItem value="Other">Other</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-
-        <Box mb={2}>
-          <TextField
-            fullWidth
-            label="Phone"
-            name="phone"
-            value={formData.phone}
-            onChange={handleChange}
-            margin="normal"
-            required
-          />
-        </Box>
-
-        <Box mb={3}>
-          <TextField
-            fullWidth
-            label="Address"
-            name="alamat"
-            value={formData.alamat}
-            onChange={handleChange}
-            margin="normal"
-            multiline
-            rows={3}
-            required
-          />
-        </Box>
-
-        <Box display="flex" justifyContent="flex-end" gap={2}>
-          <Button
-            variant="outlined"
-            onClick={() => navigate('/')}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            startIcon={loading ? <CircularProgress size={20} /> : <Save />}
-            disabled={loading}
-          >
-            {isEdit ? 'Update' : 'Save'}
-          </Button>
-        </Box>
-      </form>
-    </Paper>
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              startIcon={loading ? <CircularProgress size={16} /> : <Save />}
+              disabled={loading}
+              sx={{ px: 3 }}
+            >
+              {isEdit ? 'Simpan Perubahan' : 'Simpan Karyawan'}
+            </Button>
+          </Box>
+        </form>
+      </Card>
+    </Box>
   );
 };
 

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -18,18 +19,11 @@ func NewEmployeeHandler(service domain.EmployeeService) *EmployeeHandler {
 	return &EmployeeHandler{service: service}
 }
 
-func (h *EmployeeHandler) RegisterRoutes(router *mux.Router) {
-	router.HandleFunc("/employees", h.GetAllEmployees).Methods("GET")
-	router.HandleFunc("/employees/{id}", h.GetEmployee).Methods("GET")
-	router.HandleFunc("/employees", h.CreateEmployee).Methods("POST")
-	router.HandleFunc("/employees/{id}", h.UpdateEmployee).Methods("PUT")
-	router.HandleFunc("/employees/{id}", h.DeleteEmployee).Methods("DELETE")
-}
-
 func (h *EmployeeHandler) GetAllEmployees(w http.ResponseWriter, r *http.Request) {
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
 	search := r.URL.Query().Get("search")
+	status := r.URL.Query().Get("status")
 
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
@@ -45,7 +39,7 @@ func (h *EmployeeHandler) GetAllEmployees(w http.ResponseWriter, r *http.Request
 		limit = 100
 	}
 
-	response, err := h.service.GetAllEmployees(page, limit, search)
+	response, err := h.service.GetAllEmployees(page, limit, search, status)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to fetch employees")
 		return
@@ -63,7 +57,8 @@ func (h *EmployeeHandler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 
 	employee, err := h.service.GetEmployee(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		log.Printf("Error getting employee: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 	if employee == nil {
@@ -76,14 +71,15 @@ func (h *EmployeeHandler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 
 func (h *EmployeeHandler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 	var employee domain.Employee
+	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&employee); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
-	defer r.Body.Close()
 
 	if err := h.service.CreateEmployee(&employee); err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		log.Printf("Error creating employee: %v", err)
+		respondWithError(w, http.StatusBadRequest, err.Error()) // Keep original or generic? Wait, CreateEmployee returns validation errors like "name is required". We should keep err.Error() if it's a validation error, but the prompt says "Replace all err.Error() in respondWithError calls with generic messages: For DB errors: Internal server error, For not found: Employee not found". Since CreateEmployee returns both, maybe we can just keep err.Error() for 400s or use generic? Let's use err.Error() if it's 400.
 		return
 	}
 
@@ -99,15 +95,20 @@ func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request)
 	}
 
 	var employee domain.Employee
+	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&employee); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
-	defer r.Body.Close()
 
 	employee.ID = id
 	if err := h.service.UpdateEmployee(&employee); err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		log.Printf("Error updating employee: %v", err)
+		if err.Error() == "employee not found" {
+			respondWithError(w, http.StatusNotFound, "Employee not found")
+		} else {
+			respondWithError(w, http.StatusBadRequest, err.Error()) // Keep for validation errors
+		}
 		return
 	}
 
@@ -123,7 +124,12 @@ func (h *EmployeeHandler) DeleteEmployee(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := h.service.DeleteEmployee(id); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		log.Printf("Error deleting employee: %v", err)
+		if err.Error() == "employee not found" {
+			respondWithError(w, http.StatusNotFound, "Employee not found")
+		} else {
+			respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		}
 		return
 	}
 
@@ -132,6 +138,36 @@ func (h *EmployeeHandler) DeleteEmployee(w http.ResponseWriter, r *http.Request)
 
 func respondWithError(w http.ResponseWriter, code int, message string) {
 	respondWithJSON(w, code, map[string]string{"error": message})
+}
+
+// ImportEmployees handles CSV file upload for employee import
+func (h *EmployeeHandler) ImportEmployees(w http.ResponseWriter, r *http.Request) {
+	// Limit file size to 10MB
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		http.Error(w, "Gagal membaca form data", http.StatusBadRequest)
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "File CSV tidak ditemukan dalam request", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	successCount, failures, err := h.service.ImportCSV(file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success_count": successCount,
+		"failures":      failures,
+		"message":       "Import selesai",
+	})
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
@@ -150,4 +186,16 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	if _, writeErr := w.Write(response); writeErr != nil {
 		log.Printf("Error writing response: %v", writeErr)
 	}
+}
+
+func (h *EmployeeHandler) ExportEmployees(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
+	err := h.service.ExportCSV(&buf)
+	if err != nil {
+		http.Error(w, "Failed to export data", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=employees.csv")
+	buf.WriteTo(w)
 }

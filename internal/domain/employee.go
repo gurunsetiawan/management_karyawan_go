@@ -1,6 +1,7 @@
 package domain
 
 import "time"
+import "io"
 
 type Employee struct {
 	ID        int       `json:"id"`
@@ -27,17 +28,20 @@ type PaginatedEmployeeResponse struct {
 }
 
 type EmployeeRepository interface {
-	FindAll(page, limit int, search string) ([]Employee, int, error)
+	FindAll(page, limit int, search, status string) ([]Employee, int, error)
 	FindByID(id int) (*Employee, error)
 	Create(employee *Employee) error
 	Update(employee *Employee) error
 	Delete(id int) error
+	ExportCSV(writer io.Writer) error
 }
 
 type EmployeeService interface {
-	GetAllEmployees(page, limit int, search string) (*PaginatedEmployeeResponse, error)
+	GetAllEmployees(page, limit int, search, status string) (*PaginatedEmployeeResponse, error)
 	GetEmployee(id int) (*Employee, error)
 	CreateEmployee(employee *Employee) error
 	UpdateEmployee(employee *Employee) error
 	DeleteEmployee(id int) error
+	ImportCSV(reader io.Reader) (int, []string, error)
+	ExportCSV(writer io.Writer) error
 }

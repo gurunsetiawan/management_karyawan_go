@@ -2,8 +2,10 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/csv"
+	"fmt"
+	"io"
 	"strings"
-	"time"
 
 	"karyawan-app/internal/domain"
 )
@@ -24,11 +26,28 @@ func escapeLike(s string) string {
 	return s
 }
 
-func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.Employee, int, error) {
+// SanitizeCSVField prevents CSV injection
+func SanitizeCSVField(s string) string {
+	if s == "" {
+		return s
+	}
+	if strings.HasPrefix(s, "=") || strings.HasPrefix(s, "+") || strings.HasPrefix(s, "-") || strings.HasPrefix(s, "@") || strings.HasPrefix(s, "\t") || strings.HasPrefix(s, "\r") {
+		return "'" + s
+	}
+	return s
+}
+
+func (r *employeeRepository) FindAll(page, limit int, search, status string) ([]domain.Employee, int, error) {
 	// First get total count
 	var total int
-	countQuery := `SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL`
+	countQuery := `SELECT COUNT(*) FROM employees WHERE 1=1`
 	var countArgs []interface{}
+
+	if status == "active" || status == "" {
+		countQuery += ` AND deleted_at IS NULL`
+	} else if status == "inactive" {
+		countQuery += ` AND deleted_at IS NOT NULL`
+	}
 	
 	if search != "" {
 		countQuery += ` AND (name LIKE ? OR email LIKE ?)`
@@ -44,8 +63,14 @@ func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.E
 	// Calculate offset
 	offset := (page - 1) * limit
 
-	query := `SELECT id, name, email, position, role, phone, alamat, created_at, updated_at FROM employees WHERE deleted_at IS NULL`
+	query := `SELECT id, name, email, position, role, phone, alamat, created_at, updated_at FROM employees WHERE 1=1`
 	var args []interface{}
+
+	if status == "active" || status == "" {
+		query += ` AND deleted_at IS NULL`
+	} else if status == "inactive" {
+		query += ` AND deleted_at IS NOT NULL`
+	}
 	
 	if search != "" {
 		query += ` AND (name LIKE ? OR email LIKE ?)`
@@ -65,16 +90,20 @@ func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.E
 	var employees []domain.Employee
 	for rows.Next() {
 		var e domain.Employee
-		var createdAtStr, updatedAtStr sql.NullString
-		if err := rows.Scan(&e.ID, &e.Name, &e.Email, &e.Position, &e.Role, &e.Phone, &e.Alamat, &createdAtStr, &updatedAtStr); err != nil {
+		var createdAt, updatedAt sql.NullTime
+		if err := rows.Scan(&e.ID, &e.Name, &e.Email, &e.Position, &e.Role, &e.Phone, &e.Alamat, &createdAt, &updatedAt); err != nil {
 			return nil, 0, err
 		}
-		// Convert string time to time.Time if needed
-		e.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr.String)
-		if updatedAtStr.Valid {
-			e.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAtStr.String)
+		if createdAt.Valid {
+			e.CreatedAt = createdAt.Time
+		}
+		if updatedAt.Valid {
+			e.UpdatedAt = updatedAt.Time
 		}
 		employees = append(employees, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
 	}
 	
 	if employees == nil {
@@ -89,8 +118,8 @@ func (r *employeeRepository) FindByID(id int) (*domain.Employee, error) {
 	row := r.db.QueryRow(query, id)
 
 	var e domain.Employee
-	var createdAtStr, updatedAtStr sql.NullString
-	err := row.Scan(&e.ID, &e.Name, &e.Email, &e.Position, &e.Role, &e.Phone, &e.Alamat, &createdAtStr, &updatedAtStr)
+	var createdAt, updatedAt sql.NullTime
+	err := row.Scan(&e.ID, &e.Name, &e.Email, &e.Position, &e.Role, &e.Phone, &e.Alamat, &createdAt, &updatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -98,9 +127,11 @@ func (r *employeeRepository) FindByID(id int) (*domain.Employee, error) {
 		return nil, err
 	}
 
-	e.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr.String)
-	if updatedAtStr.Valid {
-		e.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAtStr.String)
+	if createdAt.Valid {
+		e.CreatedAt = createdAt.Time
+	}
+	if updatedAt.Valid {
+		e.UpdatedAt = updatedAt.Time
 	}
 	return &e, nil
 }
@@ -123,13 +154,73 @@ func (r *employeeRepository) Create(employee *domain.Employee) error {
 
 func (r *employeeRepository) Update(employee *domain.Employee) error {
 	query := `UPDATE employees SET name=?, email=?, position=?, role=?, phone=?, alamat=?, updated_at=NOW() WHERE id=? AND deleted_at IS NULL`
-	_, err := r.db.Exec(query, employee.Name, employee.Email, employee.Position, employee.Role, employee.Phone, employee.Alamat, employee.ID)
-	return err
+	result, err := r.db.Exec(query, employee.Name, employee.Email, employee.Position, employee.Role, employee.Phone, employee.Alamat, employee.ID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("employee not found")
+	}
+	return nil
 }
 
 func (r *employeeRepository) Delete(id int) error {
 	// Soft delete - set deleted_at timestamp instead of actually deleting
 	query := `UPDATE employees SET deleted_at=NOW() WHERE id=? AND deleted_at IS NULL`
-	_, err := r.db.Exec(query, id)
-	return err
+	result, err := r.db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("employee not found")
+	}
+	return nil
+}
+
+func (r *employeeRepository) ExportCSV(writer io.Writer) error {
+	query := "SELECT name, email, position, role, phone, alamat FROM employees WHERE deleted_at IS NULL ORDER BY id ASC"
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	csvWriter := csv.NewWriter(writer)
+	// Don't defer csvWriter.Flush(), just call it before returning
+	
+	if err := csvWriter.Write([]string{"Name", "Email", "Position", "Role", "Phone", "Alamat"}); err != nil {
+		return err
+	}
+
+	for rows.Next() {
+		var name, email, position, role, phone, alamat string
+		if err := rows.Scan(&name, &email, &position, &role, &phone, &alamat); err != nil {
+			return err
+		}
+		
+		name = SanitizeCSVField(name)
+		email = SanitizeCSVField(email)
+		position = SanitizeCSVField(position)
+		role = SanitizeCSVField(role)
+		phone = SanitizeCSVField(phone)
+		alamat = SanitizeCSVField(alamat)
+
+		if err := csvWriter.Write([]string{name, email, position, role, phone, alamat}); err != nil {
+			return err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	
+	csvWriter.Flush()
+	return csvWriter.Error()
 }

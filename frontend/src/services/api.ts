@@ -92,13 +92,16 @@ class ApiService {
   }
 
   // Employee methods
-  public async getEmployees(page: number = 1, limit: number = 10, search: string = '', config?: AxiosRequestConfig): Promise<PaginatedEmployeeResponse> {
+  public async getEmployees(page: number = 1, limit: number = 10, search: string = '', status: string = 'all', config?: AxiosRequestConfig): Promise<PaginatedEmployeeResponse> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
     if (search) {
       params.append('search', search);
+    }
+    if (status && status !== 'all') {
+      params.append('status', status);
     }
     return this.get<PaginatedEmployeeResponse>(`/api/employees?${params.toString()}`, config);
   }

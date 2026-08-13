@@ -87,6 +87,8 @@ func main() {
 	// Note: You can remove this line to make employee routes public
 	// Currently employees API requires authentication
 	protectedRouter.HandleFunc("/employees", employeeHandler.GetAllEmployees).Methods("GET")
+	protectedRouter.HandleFunc("/employees/export", employeeHandler.ExportEmployees).Methods("GET")
+	protectedRouter.HandleFunc("/employees/import", employeeHandler.ImportEmployees).Methods("POST")
 	protectedRouter.HandleFunc("/employees/{id}", employeeHandler.GetEmployee).Methods("GET")
 	protectedRouter.HandleFunc("/employees", employeeHandler.CreateEmployee).Methods("POST")
 	protectedRouter.HandleFunc("/employees/{id}", employeeHandler.UpdateEmployee).Methods("PUT")
