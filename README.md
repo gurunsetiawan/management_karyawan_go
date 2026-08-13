@@ -189,25 +189,29 @@ make test-coverage
 
 ### ✅ **Manajemen Karyawan**
 - Tambah karyawan baru
-- Lihat daftar karyawan dengan pagination
+- Lihat daftar karyawan dengan pagination (`page`, `limit`)
 - Edit data karyawan
-- Hapus karyawan (soft delete)
-- Pencarian dan filter
-- Export data (CSV, Print)
+- Hapus karyawan (soft delete via `deleted_at`)
+- Filter status karyawan (`status=active`, `status=inactive`, `status=all`)
+- Pencarian berdasarkan nama/email/jabatan (`search`)
+- Export data karyawan (CSV Streaming dengan proteksi CSV Formula Injection)
+- Import data karyawan via CSV (dengan validasi & sanitasi XSS)
+- Print table data karyawan
 
 ### ✅ **Keamanan & Validasi**
 - **JWT Authentication**: Token-based auth
-- **Input Sanitization**: Mencegah XSS attacks
+- **Input Sanitization**: Mencegah XSS attacks pada input & import CSV
+- **CSV Injection Protection**: Prefix formula berbahaya (`=`, `+`, `-`, `@`) saat export
 - **Rate Limiting**: 100 requests per minute per IP
 - **CORS Headers**: Cross-origin resource sharing
 - **Form Validation**: Client-side dan server-side validation
 - **Password Hashing**: bcrypt untuk password
 
-### ✅ **User Experience**
-- **Loading States**: Visual feedback saat loading
-- **Error Handling**: Pesan error yang informatif
-- **Responsive Design**: Mobile-friendly interface
-- **Modern UI**: Material-UI untuk tampilan konsisten
+### ✅ **User Experience & UI**
+- **MUI CRUD Dashboard Template**: Layout modern dengan Left Sidebar Navigation, Breadcrumbs, dan Card Containers.
+- **Light / Dark Mode**: Toggle mode terang dan gelap dinamis.
+- **Loading States & Toast Alerts**: Visual feedback dengan Material-UI Snackbar & CircularProgress.
+- **Responsive Design**: Mobile & Desktop friendly interface.
 
 ## 📝 Dokumentasi API
 
@@ -252,15 +256,17 @@ GET /api/health
 
 ### Employees API (Protected - Requires Authentication)
 
-Semua endpoint employees sekarang **memerlukan JWT token** untuk akses.
+Semua endpoint employees **memerlukan JWT token** di header `Authorization: Bearer <token>`.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/employees` | Get all employees |
-| GET | `/api/employees/:id` | Get employee by ID |
-| POST | `/api/employees` | Create new employee |
-| PUT | `/api/employees/:id` | Update employee |
-| DELETE | `/api/employees/:id` | Delete employee (soft) |
+| Method | Endpoint | Query Parameters | Description |
+|--------|----------|------------------|-------------|
+| GET | `/api/employees` | `page`, `limit`, `search`, `status` (`active`, `inactive`, `all`) | Get paginated employees |
+| GET | `/api/employees/:id` | - | Get employee by ID |
+| POST | `/api/employees` | - | Create new employee |
+| PUT | `/api/employees/:id` | - | Update employee |
+| DELETE | `/api/employees/:id` | - | Soft delete employee |
+| GET | `/api/employees/export` | - | Export all employees as CSV file |
+| POST | `/api/employees/import` | - (multipart/form-data `file`) | Import employees from CSV file |
 
 ### Contoh Request dengan curl
 
