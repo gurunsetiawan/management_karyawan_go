@@ -1,120 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   BrowserRouter as Router, 
   Routes, 
   Route, 
-  Navigate, 
-  useLocation, 
-  Link as RouterLink,
-  Outlet
+  Navigate 
 } from 'react-router-dom';
-import { 
-  Container, 
-  AppBar, 
-  Toolbar, 
-  Typography, 
-  Box, 
-  Button,
-  CircularProgress
-} from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { getCustomTheme } from './theme';
 import EmployeeList from './components/EmployeeList';
 import EmployeeForm from './components/EmployeeForm';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
-import { getCurrentUser, logout } from './services/auth';
+import { DashboardLayout } from './components/layout/DashboardLayout';
 
-const Navigation = () => {
-  const location = useLocation();
-  const [user, setUser] = useState(getCurrentUser());
-  const [loading, setLoading] = useState(false);
+function App() {
+  const [mode, setMode] = useState<'light' | 'dark'>('light');
 
-  useEffect(() => {
-    setUser(getCurrentUser());
-  }, [location]);
+  const theme = useMemo(() => createTheme(getCustomTheme(mode)), [mode]);
 
-  const handleLogout = () => {
-    try {
-      setLoading(true);
-      logout();
-      window.location.href = '/login';
-    } catch (error) {
-      console.error('Logout failed:', error);
-      setLoading(false);
-    }
+  const toggleMode = () => {
+    setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
   };
 
   return (
-    <AppBar position="static">
-      <Toolbar>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          <RouterLink to="/" style={{ color: 'white', textDecoration: 'none' }}>
-            Employee Management System
-          </RouterLink>
-        </Typography>
-        {user ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1">
-              Welcome, {user.username} ({user.role})
-            </Typography>
-            <Button 
-              variant="outlined" 
-              color="inherit" 
-              onClick={handleLogout}
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-              sx={{ color: 'white', borderColor: 'white' }}
-            >
-              {loading ? 'Logging out...' : 'Logout'}
-            </Button>
-          </Box>
-        ) : (
-          <Button 
-            color="inherit" 
-            component={RouterLink} 
-            to="/login"
-            state={{ from: location.pathname }}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Protected routes wrapped in DashboardLayout */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <DashboardLayout mode={mode} onToggleMode={toggleMode} />
+              </ProtectedRoute>
+            }
           >
-            Login
-          </Button>
-        )}
-      </Toolbar>
-    </AppBar>
-  );
-};
-
-// Protected layout component
-const ProtectedLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => (
-  <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-    <Navigation />
-    <Container component="main" sx={{ mt: 4, mb: 4, flex: 1 }}>
-      {children || <Outlet />}
-    </Container>
-  </Box>
-);
-
-function App() {
-  return (
-    <Router>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<Login />} />
-        
-        {/* Protected routes */}
-        <Route element={
-          <ProtectedRoute>
-            <ProtectedLayout />
-          </ProtectedRoute>
-        }>
-          <Route path="/" element={<EmployeeList />} />
-          <Route path="/employees" element={<EmployeeList />} />
-          <Route path="/employees/new" element={<EmployeeForm />} />
-          <Route path="/employees/:id/edit" element={<EmployeeForm />} />
-        </Route>
-        
-        {/* Catch all other routes */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+            <Route path="/" element={<EmployeeList />} />
+            <Route path="/employees" element={<EmployeeList />} />
+            <Route path="/employees/new" element={<EmployeeForm />} />
+            <Route path="/employees/:id/edit" element={<EmployeeForm />} />
+          </Route>
+          
+          {/* Catch all other routes */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </ThemeProvider>
   );
 }
 
