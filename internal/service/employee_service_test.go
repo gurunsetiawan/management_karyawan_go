@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"karyawan-app/internal/domain"
+	"karyawan-app/internal/repository"
 )
 
 func getTime() time.Time {
@@ -193,6 +194,44 @@ func TestSanitizeEmployee(t *testing.T) {
 	}
 }
 
+func TestSanitizeEmployee_EmailPreserved(t *testing.T) {
+	employee := &domain.Employee{
+		Name:     "John",
+		Email:    "o'brien@example.com",
+		Position: "Developer",
+		Role:     "Engineer",
+		Phone:    "1234567890",
+		Alamat:   "123 Main St",
+	}
+
+	sanitizeEmployee(employee)
+
+	if employee.Email != "o'brien@example.com" {
+		t.Errorf("Email was mangled: %s", employee.Email)
+	}
+}
+
+func TestSanitizeCSVField(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"=CMD|'/C calc'!A0", "'=CMD|'/C calc'!A0"},
+		{"+1234", "'+1234"},
+		{"-formula", "'-formula"},
+		{"@SUM(A1)", "'@SUM(A1)"},
+		{"Normal text", "Normal text"},
+		{"", ""},
+	}
+
+	for _, test := range tests {
+		result := repository.SanitizeCSVField(test.input)
+		if result != test.expected {
+			t.Errorf("SanitizeCSVField(%q) = %q, expected %q", test.input, result, test.expected)
+		}
+	}
+}
+
 // Benchmark tests
 func BenchmarkSanitizeInput(b *testing.B) {
 	input := "<script>alert('xss')</script>"
@@ -226,9 +265,13 @@ func BenchmarkValidateEmployee(b *testing.B) {
 // MockEmployeeRepo is a mock implementation of domain.EmployeeRepository
 type MockEmployeeRepo struct {
 	CreateFunc func(employee *domain.Employee) error
+	FindAllFunc func(page, limit int, search, status string) ([]domain.Employee, int, error)
 }
 
 func (m *MockEmployeeRepo) FindAll(page, limit int, search, status string) ([]domain.Employee, int, error) {
+	if m.FindAllFunc != nil {
+		return m.FindAllFunc(page, limit, search, status)
+	}
 	return nil, 0, nil
 }
 func (m *MockEmployeeRepo) FindByID(id int) (*domain.Employee, error) { return nil, nil }
@@ -309,5 +352,46 @@ func TestExportCSV(t *testing.T) {
 	err := svc.ExportCSV(&b)
 	if err != nil {
 		t.Errorf("Expected nil error, got %v", err)
+	}
+}
+
+func TestGetAllEmployees_StatusFilter(t *testing.T) {
+	var capturedStatus string
+	mockRepo := &MockEmployeeRepo{
+		FindAllFunc: func(page, limit int, search, status string) ([]domain.Employee, int, error) {
+			capturedStatus = status
+			return nil, 0, nil
+		},
+	}
+	svc := NewEmployeeService(mockRepo)
+
+	tests := []string{"active", "inactive", "all", ""}
+	for _, status := range tests {
+		_, err := svc.GetAllEmployees(1, 10, "", status)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if capturedStatus != status {
+			t.Errorf("Expected status %q to be passed to repo, got %q", status, capturedStatus)
+		}
+	}
+}
+
+func TestGetAllEmployees_Pagination(t *testing.T) {
+	mockRepo := &MockEmployeeRepo{
+		FindAllFunc: func(page, limit int, search, status string) ([]domain.Employee, int, error) {
+			return []domain.Employee{{ID: 1}, {ID: 2}}, 12, nil
+		},
+	}
+	svc := NewEmployeeService(mockRepo)
+	res, err := svc.GetAllEmployees(2, 5, "", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Meta.Total != 12 {
+		t.Errorf("expected 12 total, got %d", res.Meta.Total)
+	}
+	if res.Meta.TotalPages != 3 {
+		t.Errorf("expected 3 total pages, got %d", res.Meta.TotalPages)
 	}
 }

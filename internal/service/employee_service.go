@@ -87,7 +87,7 @@ func (s *employeeService) DeleteEmployee(id int) error {
 // sanitizeEmployee sanitizes all string fields in the employee struct
 func sanitizeEmployee(employee *domain.Employee) {
 	employee.Name = sanitizeInput(employee.Name)
-	employee.Email = sanitizeInput(employee.Email)
+	employee.Email = strings.TrimSpace(employee.Email)
 	employee.Position = sanitizeInput(employee.Position)
 	employee.Role = sanitizeInput(employee.Role)
 	employee.Phone = sanitizeInput(employee.Phone)
@@ -184,6 +184,8 @@ func (s *employeeService) ImportCSV(csvData io.Reader) (int, []string, error) {
 			Phone:    strings.TrimSpace(row[4]),
 			Alamat:   strings.TrimSpace(row[5]),
 		}
+
+		sanitizeEmployee(emp)
 
 		if err := validateEmployee(emp); err != nil {
 			failures = append(failures, fmt.Sprintf("Baris %d: %v", rowNum, err))
