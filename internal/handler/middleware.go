@@ -3,6 +3,9 @@ package handler
 import (
 	"log"
 	"net/http"
+	"net"
+	"strings"
+	"os"
 	"sync"
 	"time"
 
@@ -36,17 +39,32 @@ func (c *ChainMiddleware) Then(h http.Handler) http.Handler {
 	return h
 }
 
+func parseAllowedOrigins(envOrigins string) []string {
+	if envOrigins == "" {
+		return []string{
+			"http://localhost:3000",
+			"http://localhost:5173",
+			"http://localhost:8080",
+			"http://localhost:8083",
+			"http://127.0.0.1:8083",
+		}
+	}
+
+	var origins []string
+	parts := strings.Split(envOrigins, ",")
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
+	return origins
+}
+
 // CORSMiddleware handles CORS headers
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Allow specific origins
-		allowedOrigins := []string{
-			"http://localhost:3000",
-			"http://localhost:5173",  // Vite dev server
-			"http://localhost:8080",
-			"http://localhost:8083",  // Go server port
-			"http://127.0.0.1:8083",  // Go server port (IP)
-		}
+		allowedOrigins := parseAllowedOrigins(os.Getenv("ALLOWED_ORIGINS"))
 
 		origin := r.Header.Get("Origin")
 		
@@ -85,6 +103,30 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// getClientIP extracts the real client IP from the request, handling reverse proxies
+func getClientIP(r *http.Request) string {
+	// 1. Try X-Forwarded-For
+	xForwardedFor := r.Header.Get("X-Forwarded-For")
+	if xForwardedFor != "" {
+		parts := strings.Split(xForwardedFor, ",")
+		return strings.TrimSpace(parts[0])
+	}
+
+	// 2. Try X-Real-IP
+	xRealIP := r.Header.Get("X-Real-IP")
+	if xRealIP != "" {
+		return strings.TrimSpace(xRealIP)
+	}
+
+	// 3. Fallback to RemoteAddr, but strip the port
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// If splitting fails (e.g., no port), just return the original
+		return r.RemoteAddr
+	}
+	return ip
+}
+
 // RateLimitMiddleware implements rate limiting
 func RateLimitMiddleware(requestsPerMinute int) Middleware {
 	// Create a rate limiter per IP
@@ -92,12 +134,12 @@ func RateLimitMiddleware(requestsPerMinute int) Middleware {
 		limiter  *rate.Limiter
 		lastSeen time.Time
 	}
-
 	var (
+		mutex   sync.Mutex
 		clients = make(map[string]*client)
 	)
 
-	// Clean up old entries
+	// Background routine to cleanup old entries
 	go func() {
 		for {
 			time.Sleep(time.Minute)
@@ -113,7 +155,7 @@ func RateLimitMiddleware(requestsPerMinute int) Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			srcIP := r.RemoteAddr
+			srcIP := getClientIP(r)
 
 			mutex.Lock()
 			if _, exists := clients[srcIP]; !exists {

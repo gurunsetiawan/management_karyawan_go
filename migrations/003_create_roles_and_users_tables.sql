@@ -28,5 +28,8 @@ INSERT IGNORE INTO roles (name, description) VALUES
 ('karyawan', 'Karyawan dengan akses terbatas');
 
 -- Insert admin default (password: admin123)
-INSERT IGNORE INTO users (username, email, password_hash, role_id) VALUES 
-('admin', 'admin@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 1);
+INSERT IGNORE INTO users (id, username, email, password_hash, role_id, is_active, created_at)
+VALUES 
+(1, 'admin', 'admin@example.com', '$2a$10$Tl0TAod9zFzUyjnuDr2BZu4QNsl39Roq0PLctPg4Enyc/Y4Wtjp6O', 1, 1, NOW()),
+(2, 'manager', 'manager@example.com', '$2a$10$Tl0TAod9zFzUyjnuDr2BZu4QNsl39Roq0PLctPg4Enyc/Y4Wtjp6O', 2, 1, NOW()),
+(3, 'user', 'user@example.com', '$2a$10$Tl0TAod9zFzUyjnuDr2BZu4QNsl39Roq0PLctPg4Enyc/Y4Wtjp6O', 3, 1, NOW());

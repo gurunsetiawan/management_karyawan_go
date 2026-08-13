@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"os/signal"
 	"strconv"
 	"syscall"
@@ -19,6 +18,19 @@ import (
 	repo "karyawan-app/internal/repository"
 	service "karyawan-app/internal/service"
 )
+
+// spaFileSystem wraps http.FileSystem to support SPA routing
+type spaFileSystem struct {
+	root http.FileSystem
+}
+
+func (fs *spaFileSystem) Open(name string) (http.File, error) {
+	f, err := fs.root.Open(name)
+	if os.IsNotExist(err) {
+		return fs.root.Open("index.html")
+	}
+	return f, err
+}
 
 func main() {
 	// Initialize database connection using shared config
@@ -94,23 +106,16 @@ func main() {
 		}
 	}).Methods("GET")
 
+
 	// Serve static files from the frontend/build directory (SPA fallback support)
 	frontendDir := "./frontend/build"
 	if _, err := os.Stat(frontendDir); !os.IsNotExist(err) {
-		r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			path := filepath.Join(frontendDir, r.URL.Path)
-			_, err := os.Stat(path)
-			if os.IsNotExist(err) {
-				http.ServeFile(w, r, filepath.Join(frontendDir, "index.html"))
-				return
-			}
-			http.FileServer(http.Dir(frontendDir)).ServeHTTP(w, r)
-		})
+		r.PathPrefix("/").Handler(http.FileServer(&spaFileSystem{http.Dir(frontendDir)}))
 	} else {
 		// Fallback to frontend directory for development
 		frontendDevDir := "./frontend"
 		if _, err := os.Stat(frontendDevDir); !os.IsNotExist(err) {
-			r.PathPrefix("/").Handler(http.FileServer(http.Dir(frontendDevDir)))
+			r.PathPrefix("/").Handler(http.FileServer(&spaFileSystem{http.Dir(frontendDevDir)}))
 		}
 	}
 
