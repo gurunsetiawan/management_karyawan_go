@@ -23,7 +23,7 @@ func NewEmployeeService(repo domain.EmployeeRepository) domain.EmployeeService {
 	return &employeeService{repo: repo}
 }
 
-func (s *employeeService) GetAllEmployees(page, limit int, search string) (*domain.PaginatedEmployeeResponse, error) {
+func (s *employeeService) GetAllEmployees(page, limit int, search, status string) (*domain.PaginatedEmployeeResponse, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -31,7 +31,7 @@ func (s *employeeService) GetAllEmployees(page, limit int, search string) (*doma
 		limit = 10
 	}
 
-	data, total, err := s.repo.FindAll(page, limit, search)
+	data, total, err := s.repo.FindAll(page, limit, search, status)
 	if err != nil {
 		return nil, err
 	}
@@ -199,4 +199,8 @@ func (s *employeeService) ImportCSV(csvData io.Reader) (int, []string, error) {
 	}
 
 	return successCount, failures, nil
+}
+
+func (s *employeeService) ExportCSV() ([]byte, error) {
+	return s.repo.ExportCSV()
 }

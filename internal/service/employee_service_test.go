@@ -226,10 +226,11 @@ type MockEmployeeRepo struct {
 	CreateFunc func(employee *domain.Employee) error
 }
 
-func (m *MockEmployeeRepo) FindAll(page, limit int, search string) ([]domain.Employee, int, error) {
+func (m *MockEmployeeRepo) FindAll(page, limit int, search, status string) ([]domain.Employee, int, error) {
 	return nil, 0, nil
 }
 func (m *MockEmployeeRepo) FindByID(id int) (*domain.Employee, error) { return nil, nil }
+func (m *MockEmployeeRepo) ExportCSV() ([]byte, error) { return nil, nil }
 func (m *MockEmployeeRepo) Create(employee *domain.Employee) error {
 	if m.CreateFunc != nil {
 		return m.CreateFunc(employee)
@@ -295,5 +296,15 @@ Andi,duplicate@example.com,Staff,User,083234,Surabaya
 	// Expect 2 failures (Tono missing email, Andi duplicate email)
 	if len(failures) != 2 {
 		t.Errorf("Expected 2 failures, got %d", len(failures))
+	}
+}
+
+func TestExportCSV(t *testing.T) {
+	mockRepo := &MockEmployeeRepo{}
+	svc := NewEmployeeService(mockRepo)
+
+	_, err := svc.ExportCSV()
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
 	}
 }

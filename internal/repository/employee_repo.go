@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"bytes"
+	"encoding/csv"
 	"database/sql"
 	"strings"
 	"time"
@@ -24,7 +26,7 @@ func escapeLike(s string) string {
 	return s
 }
 
-func (r *employeeRepository) FindAll(page, limit int, search string) ([]domain.Employee, int, error) {
+func (r *employeeRepository) FindAll(page, limit int, search, status string) ([]domain.Employee, int, error) {
 	// First get total count
 	var total int
 	countQuery := `SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL`
@@ -132,4 +134,27 @@ func (r *employeeRepository) Delete(id int) error {
 	query := `UPDATE employees SET deleted_at=NOW() WHERE id=? AND deleted_at IS NULL`
 	_, err := r.db.Exec(query, id)
 	return err
+}
+
+func (r *employeeRepository) ExportCSV() ([]byte, error) {
+	query := "SELECT name, email, position, role, phone, alamat FROM employees WHERE is_deleted = false ORDER BY id ASC"
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var b bytes.Buffer
+	writer := csv.NewWriter(&b)
+	writer.Write([]string{"Name", "Email", "Position", "Role", "Phone", "Alamat"})
+
+	for rows.Next() {
+		var name, email, position, role, phone, alamat string
+		if err := rows.Scan(&name, &email, &position, &role, &phone, &alamat); err != nil {
+			return nil, err
+		}
+		writer.Write([]string{name, email, position, role, phone, alamat})
+	}
+	writer.Flush()
+	return b.Bytes(), nil
 }

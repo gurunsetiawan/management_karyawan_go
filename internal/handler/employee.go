@@ -31,6 +31,7 @@ func (h *EmployeeHandler) GetAllEmployees(w http.ResponseWriter, r *http.Request
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
 	search := r.URL.Query().Get("search")
+	status := r.URL.Query().Get("status")
 
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
@@ -46,7 +47,7 @@ func (h *EmployeeHandler) GetAllEmployees(w http.ResponseWriter, r *http.Request
 		limit = 100
 	}
 
-	response, err := h.service.GetAllEmployees(page, limit, search)
+	response, err := h.service.GetAllEmployees(page, limit, search, status)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to fetch employees")
 		return
@@ -181,4 +182,15 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	if _, writeErr := w.Write(response); writeErr != nil {
 		log.Printf("Error writing response: %v", writeErr)
 	}
+}
+
+func (h *EmployeeHandler) ExportEmployees(w http.ResponseWriter, r *http.Request) {
+	data, err := h.service.ExportCSV()
+	if err != nil {
+		http.Error(w, "Failed to export data", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=employees.csv")
+	w.Write(data)
 }

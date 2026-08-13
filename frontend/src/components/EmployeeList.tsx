@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Button, IconButton, TextField, AppBar, Toolbar,
   Tooltip, Snackbar, Alert, LinearProgress, InputAdornment,
-  Typography, Paper, Grid, Dialog, DialogTitle, DialogContent, DialogActions
+  Typography, Paper, Grid, Dialog, DialogTitle, DialogContent, DialogActions, Avatar, Chip, ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import { DataGrid, GridColDef, GridSortModel, GridToolbar } from '@mui/x-data-grid';
 import {
@@ -14,7 +14,10 @@ import {
   Person as PersonIcon,
   Email as EmailIcon,
   Phone as PhoneIcon,
-  CloudUpload as CloudUploadIcon
+  CloudUpload as CloudUploadIcon,
+  Print as PrintIcon,
+  Badge as BadgeIcon,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -31,6 +34,36 @@ interface SnackbarState {
   severity: 'success' | 'error' | 'info' | 'warning';
 }
 
+
+// Helper functions for Avatar
+function stringToColor(string: string) {
+  let hash = 0;
+  let i;
+  for (i = 0; i < string.length; i += 1) {
+    hash = string.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (i = 0; i < 3; i += 1) {
+    const value = (hash >> (i * 8)) & 0xff;
+    color += `00${value.toString(16)}`.slice(-2);
+  }
+  return color;
+}
+
+function stringAvatar(name: string) {
+  const parts = name.split(' ');
+  const init = parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : name[0];
+  return {
+    sx: {
+      bgcolor: stringToColor(name),
+      width: 32,
+      height: 32,
+      fontSize: '0.875rem'
+    },
+    children: init.toUpperCase(),
+  };
+}
+
 const EmployeeList: React.FC = () => {
   const navigate = useNavigate();
   
@@ -38,6 +71,7 @@ const EmployeeList: React.FC = () => {
   const [employees, setEmployees] = useState<EmployeeWithRole[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [snackbar, setSnackbar] = useState<SnackbarState>({
     open: false,
     message: '',
@@ -56,10 +90,10 @@ const EmployeeList: React.FC = () => {
   const [importing, setImporting] = useState(false);
 
   // Fetch employees on component mount
-  const fetchEmployees = useCallback(async (searchQuery: string = '', signal?: AbortSignal) => {
+  const fetchEmployees = useCallback(async (searchQuery: string = '', status: string = 'all', signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const res = await api.getEmployees(paginationModel.page + 1, paginationModel.pageSize, searchQuery, { signal });
+      const res = await api.getEmployees(paginationModel.page + 1, paginationModel.pageSize, searchQuery, status, { signal });
       const typedEmployees = (res.data || []).map(emp => ({
         ...emp,
         role: emp.role || 'user'
@@ -82,7 +116,7 @@ const EmployeeList: React.FC = () => {
   useEffect(() => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetchEmployees(searchTerm, controller.signal);
+      fetchEmployees(searchTerm, statusFilter, controller.signal);
     }, 300);
     return () => {
       clearTimeout(timer);
@@ -105,6 +139,28 @@ const EmployeeList: React.FC = () => {
 
   const handleEdit = (id: number) => {
     navigate(`/employees/${id}/edit`);
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://127.0.0.1:8083/api/employees/export', {
+        headers: { 'Authorization': `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'employees.csv');
+      document.body.appendChild(link);
+      link.click();
+    } catch (err) {
+      showSnackbar('Gagal mengekspor data', 'error');
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   const handleAddNew = () => {
@@ -180,11 +236,17 @@ const EmployeeList: React.FC = () => {
     {
       field: 'name',
       headerName: 'Nama',
-      flex: 1,
+      flex: 1.5,
       renderHeader: () => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <PersonIcon sx={{ mr: 1 }} />
           <span>Nama</span>
+        </Box>
+      ),
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Avatar {...stringAvatar(params.row.name)} />
+          <Typography variant="body2" fontWeight="500">{params.row.name}</Typography>
         </Box>
       )
     },
@@ -197,7 +259,38 @@ const EmployeeList: React.FC = () => {
           <WorkIcon sx={{ mr: 1 }} />
           <span>Jabatan</span>
         </Box>
+      ),
+      renderCell: (params) => (
+        <Chip 
+          label={params.row.position} 
+          size="small" 
+          color="primary" 
+          variant="outlined" 
+          sx={{ borderRadius: 1 }} 
+        />
       )
+    },
+    {
+      field: 'role',
+      headerName: 'Role',
+      flex: 0.8,
+      renderHeader: () => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <BadgeIcon sx={{ mr: 1 }} />
+          <span>Role</span>
+        </Box>
+      ),
+      renderCell: (params) => {
+        const isManager = params.row.role?.toLowerCase() === 'manager';
+        const isAdmin = params.row.role?.toLowerCase() === 'admin';
+        return (
+          <Chip 
+            label={params.row.role} 
+            size="small" 
+            color={isAdmin ? 'error' : isManager ? 'warning' : 'default'} 
+          />
+        );
+      }
     },
     {
       field: 'email',
@@ -259,13 +352,7 @@ const EmployeeList: React.FC = () => {
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <AppBar position="static" color="default" elevation={1}>
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Daftar Karyawan
-          </Typography>
-        </Toolbar>
-      </AppBar>
+      
 
       <Box sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column' }}>
         <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -287,8 +374,42 @@ const EmployeeList: React.FC = () => {
                 ),
               }}
             />
+            <Box sx={{ mt: 2 }}>
+              <ToggleButtonGroup
+                color="primary"
+                value={statusFilter}
+                exclusive
+                onChange={(e, newStatus) => {
+                  if (newStatus !== null) {
+                    setStatusFilter(newStatus);
+                    setPaginationModel(prev => ({ ...prev, page: 0 }));
+                  }
+                }}
+                size="small"
+              >
+                <ToggleButton value="all">Semua</ToggleButton>
+                <ToggleButton value="active">Aktif</ToggleButton>
+                <ToggleButton value="inactive">Non-Aktif</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={handlePrint}
+              startIcon={<PrintIcon />}
+            >
+              Print
+            </Button>
+            <Button
+              variant="outlined"
+              color="success"
+              onClick={handleExportCSV}
+              startIcon={<DownloadIcon />}
+            >
+              Export
+            </Button>
             <Button
               variant="outlined"
               color="primary"
@@ -334,8 +455,19 @@ const EmployeeList: React.FC = () => {
             }}
             sx={{
               '& .MuiDataGrid-columnHeaders': {
-                backgroundColor: 'primary.light',
+                backgroundColor: 'primary.main',
                 color: 'primary.contrastText',
+              },
+              '@media print': {
+                '.MuiDataGrid-root': {
+                  border: 'none',
+                },
+                '.MuiDataGrid-footerContainer': {
+                  display: 'none',
+                },
+                '.MuiDataGrid-virtualScroller': {
+                  overflow: 'visible !important',
+                },
               },
               '& .MuiDataGrid-cell': {
                 borderBottom: '1px solid rgba(224, 224, 224, 1)',
