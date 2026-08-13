@@ -122,14 +122,14 @@ const EmployeeList: React.FC = () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [fetchEmployees, searchTerm]);
+  }, [fetchEmployees, searchTerm, statusFilter]);
 
   // Event handlers
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus data karyawan ini?')) {
+    if (window.confirm('Apakah Anda yakin ingin menghapus data karyawan ini?')) {
       try {
         await api.deleteEmployee(id);
-        await fetchEmployees();
+        await fetchEmployees(searchTerm, statusFilter);
         showSnackbar('Data karyawan berhasil dihapus', 'success');
       } catch (error) {
         showSnackbar('Gagal menghapus data karyawan', 'error');
@@ -144,7 +144,8 @@ const EmployeeList: React.FC = () => {
   const handleExportCSV = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://127.0.0.1:8083/api/employees/export', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8083';
+      const response = await axios.get(`${API_URL}/api/employees/export`, {
         headers: { 'Authorization': `Bearer ${token}` },
         responseType: 'blob'
       });
@@ -154,6 +155,8 @@ const EmployeeList: React.FC = () => {
       link.setAttribute('download', 'employees.csv');
       document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       showSnackbar('Gagal mengekspor data', 'error');
     }
@@ -198,7 +201,8 @@ const EmployeeList: React.FC = () => {
     try {
       setImporting(true);
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://127.0.0.1:8083/api/employees/import', formData, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8083';
+      const response = await axios.post(`${API_URL}/api/employees/import`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`
@@ -215,9 +219,10 @@ const EmployeeList: React.FC = () => {
       
       setImportDialogOpen(false);
       setImportFile(null);
-      fetchEmployees(searchTerm);
+      fetchEmployees(searchTerm, statusFilter);
     } catch (err: any) {
-      showSnackbar(err.response?.data || 'Gagal mengimpor file', 'error');
+      const errorMsg = typeof err.response?.data === 'string' ? err.response.data : 'Gagal mengimpor file';
+      showSnackbar(errorMsg, 'error');
     } finally {
       setImporting(false);
     }
